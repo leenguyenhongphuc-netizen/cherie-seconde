@@ -71,7 +71,7 @@ const PK={tamtrung:{ten:"Tầm trung",mo:"Thương hiệu Việt và quốc tế
 const LUX=["chanel","hermès","hermes","louis vuitton","dior","gucci","prada","celine","céline","fendi","bottega","saint laurent","ysl","balenciaga","givenchy","valentino","loewe","burberry","miu miu","chloé","chloe","versace","cartier","bvlgari","tiffany","goyard","jimmy choo","manolo"];
 const CAOCAP=["sixdo","nem","elise","d.chic","coach","kate spade","michael kors","tory burch","furla","longchamp","massimo dutti","cos","sandro","maje","ted baker","self-portrait","reformation","charles & keith","pedro","marc jacobs","calvin klein","ralph lauren","lacoste"];
 /* Báo giá tức thì [GĐ]: giá bán lại dự kiến = % giá mua theo phân khúc và hạng; tiệm mua đứt = % giá bán dự kiến; tín dụng cộng thêm. */
-const UOC={tamtrung:{A:.30,B:.22,C:.12},caocap:{A:.40,B:.30,C:.18},luxury:{A:.65,B:.55,C:.40}};
+const UOC={tamtrung:{A:.30,B:.22,C:.12},caocap:{A:.40,B:.30,C:.18},luxury:{A:.50,B:.40,C:.25}};
 const MUA_DUT={tamtrung:.40,caocap:.45,luxury:.60};
 const TIN_DUNG=1.20;
 const GIA_THUE=[130000,260000];
@@ -81,7 +81,10 @@ function danhMuc(m){ if(m.danhMuc&&DM.some(d=>d[0]===m.danhMuc)) return m.danhMu
   if(/túi|\bbag\b|ví|clutch|balo/.test(s)) return "tui"; if(/giày|sandal|cao gót|boot|sneaker|dép/.test(s)) return "giay"; if(/khăn|bông tai|vòng|kính|thắt lưng|phụ kiện|trang sức|nón|mũ/.test(s)) return "phukien";
   if(/vest|blazer|công sở|sơ mi|quần/.test(s)) return "congso"; if(/áo|chân váy|croptop/.test(s)) return "ao"; return "dam"; }
 function tenDM(k){ const d=DM.find(x=>x[0]===k); return d?d[1]:"Tất cả"; }
-function uocTinh(o){ const pk=phanKhuc({brand:o.brand,giaNiemYet:o.giaMua}); const p=(UOC[pk]||UOC.tamtrung)[o.hang||"B"]; const giua=tron((Number(o.giaMua)||0)*p); return {pk,giua,thap:tron(giua*.9),cao:tron(giua*1.1)}; }
+/* Luxury theo hãng [GĐ]: hạng A ≈ 85% tỷ lệ giữ giá trong Rebag Clair Report 2024 (Hermès 100%, Chanel 92%, LV 88%, Dior/YSL ~75%, Gucci ~70%, Prada 69%, Celine 64%…), hạng B = A − 10 điểm, hạng C = A − 25 điểm. */
+const HANG_LUX=[["hermès",.85],["hermes",.85],["goyard",.85],["chanel",.78],["louis vuitton",.75],["dior",.64],["saint laurent",.64],["ysl",.64],["gucci",.60],["prada",.59],["celine",.54],["céline",.54],["fendi",.54],["bottega",.54],["balenciaga",.54],["loewe",.51],["chloé",.48],["chloe",.48],["givenchy",.48],["miu miu",.40],["valentino",.40]];
+function tyLeUoc(brand,pk,hang){ const b=String(brand||"").toLowerCase(); const h=pk==="luxury"&&HANG_LUX.find(([k])=>b.includes(k)); if(h){ const a=h[1]; return hang==="A"?a:hang==="B"?a-.10:a-.25; } return (UOC[pk]||UOC.tamtrung)[hang||"B"]; }
+function uocTinh(o){ const pk=phanKhuc({brand:o.brand,giaNiemYet:o.giaMua}); const p=tyLeUoc(o.brand,pk,o.hang||"B"); const giua=tron((Number(o.giaMua)||0)*p); return {pk,giua,thap:tron(giua*.9),cao:tron(giua*1.1)}; }
 
 let THICH=new Set(); try{ THICH=new Set(JSON.parse(localStorage.getItem("seconde-thich")||"[]")); }catch(e){}
 function luuThich(){ try{ localStorage.setItem("seconde-thich",JSON.stringify([...THICH])); }catch(e){} }
