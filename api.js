@@ -98,5 +98,5 @@
     });
   }
 
-  window.SC = { call: call, saveAuth: saveAuth, token: function () { return token; }, me: function () { return me; }, db: db, assets: assets, start: start, reload: tai };
+  window.SC = { apply: apply, call: call, saveAuth: saveAuth, token: function () { return token; }, me: function () { return me; }, db: db, assets: assets, start: start, reload: tai };
 })();

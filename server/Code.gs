@@ -13,9 +13,9 @@ var ZALO = "0377 159 189";
 /* bộ sưu tập ↔ tab */
 var TAB = { mon: "Mon", dathang: "DatHang", don: "DonBan", dangky: "DangKy", thue: "LuotThue" };
 var PREFIX = { mon: "M", dathang: "DH", don: "DB", dangky: "DK", thue: "LT" };
-var JSON_F = ["tinhTrang", "anh", "lichSu", "items", "anhKH", "ai", "phuKien"];
+var JSON_F = ["tinhTrang", "anh", "lichSu", "items", "anhKH", "ai", "phuKien", "nhatTrinh", "dieuKhoan"];
 var BOOL_F = ["daTra", "live", "vidu"];
-var NUM_F = ["soLuot", "giaNiemYet", "giaSale", "giaDang", "giaSan", "gia", "tiemHuong", "phiSan", "tienChuDo", "tienThueDaTra", "giaMua", "giaMuon", "tien", "chiaChuDo", "tong", "uocTinh", "offer", "giaVon"];
+var NUM_F = ["soLuot", "giaNiemYet", "giaSale", "giaDang", "giaSan", "gia", "tiemHuong", "phiSan", "tienChuDo", "tienThueDaTra", "giaMua", "giaMuon", "tien", "chiaChuDo", "tong", "uocTinh", "offer", "giaVon", "giaChot"];
 var TT_MON = ["cho", "dang", "giu", "ban", "thue", "tra"];
 
 /* quy tắc giá: khớp app (app.js) */
@@ -62,7 +62,12 @@ function handle(q) {
     case "upAnhKH": return upAnhKH(q);
     case "aiDanhGia": return aiDanhGia(q);
     case "docGiayTo": return docGiayTo(q);
-    case "kyHopDong": return kyHopDong(q);
+    case "guiDinhGia": return guiDinhGia(q);
+    case "xemHD": return xemHD(q);
+    case "kyHD": return kyHD(q);
+    case "theoDoi": return theoDoiKH(q);
+    case "taoHD": return taoHD(auth(q.token), q);
+    case "themKhau": return themKhau(auth(q.token), q);
     case "anhRieng": return anhRieng(auth(q.token), q);
     case "hoSoDK": return hoSoDK(auth(q.token), q);
     case "staff": return { staff: staffList() };
@@ -456,7 +461,7 @@ function docGiayTo(q) {
 }
 function sha256(t) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8).map(function (b) { return ("0" + (b & 255).toString(16)).slice(-2); }).join(""); }
 function tabCo(name, head) { var sh = ss().getSheetByName(name); if (!sh) { sh = ss().insertSheet(name); sh.getRange(1, 1, 1, head.length).setValues([head]); sh.setFrozenRows(1); } return tab(name); }
-var HD_HEAD = ["id", "dangkyId", "ngayKy", "gioMayChu", "phienBan", "hash", "hinh", "hoTen", "ngaySinh", "cccd", "diaChi", "sdt", "nganHang", "soTK", "chuTK", "cccdTruoc", "cccdSau", "dongYAnh", "chuKy", "vanBan", "thietBi", "phien", "trangThai"];
+var HD_HEAD = ["id", "dangkyId", "ngayKy", "gioMayChu", "phienBan", "hash", "hinh", "hoTen", "ngaySinh", "cccd", "diaChi", "sdt", "nganHang", "soTK", "chuTK", "cccdTruoc", "cccdSau", "dongYAnh", "chuKy", "vanBan", "thietBi", "phien", "trangThai", "token", "dieuKhoan", "taoLuc", "taoBoi"];
 function kyHopDong(q) {
   var p = phienOk(q.phien), h = q.hd || {};
   var sdt = sdtOk(h.sdt); if (!sdt) fail("Số Zalo chưa đúng (10 số, bắt đầu bằng 0)", "bad_request");
@@ -504,4 +509,135 @@ function hoSoDK(me, q) {
   if (!isOwner(me)) { x.cccd = "••••" + String(x.cccd).slice(-4); x.soTK = x.soTK ? "••••" + String(x.soTK).slice(-4) : ""; x.cccdTruoc = ""; x.cccdSau = ""; x.chuKy = ""; x.ngaySinh = ""; }
   if (x.vanBan) { try { x.noiDung = DriveApp.getFileById(x.vanBan).getBlob().getDataAsString("UTF-8"); } catch (e) {} }
   return { ok: true, hd: x };
+}
+
+
+/* =====================================================================
+   QUY TRÌNH MỚI (02/11 17:30, theo chị Phúc):
+   1. Web: khách chỉ ĐỊNH GIÁ (ảnh → AI → cách bán → giá ước tính) rồi gửi tên + Zalo (guiDinhGia).
+   2. Nhân viên sale tư vấn qua Zalo, kiểm đồ, chốt giá trong app nội bộ → tạo LINK HỢP ĐỒNG (taoHD).
+   3. Khách mở link: ảnh CCCD/VNeID → kiểm tra thông tin → ký (xemHD, kyHD). Tại quầy: nhân viên mở cùng link trên máy tiệm.
+   4. Mỗi khâu sau đó (nhận đồ, kiểm định, vệ sinh, chụp ảnh, gắn tag, lên kệ, bán, trả tiền) ghi kèm ảnh (themKhau).
+   5. Khách theo dõi bằng link riêng (theoDoiKH).
+   ===================================================================== */
+var KHAU = ["guiDK", "taoHD", "kyHD", "nhanDo", "kiemDinh", "veSinh", "chupAnh", "ganTag", "lenKe", "daBan", "traTien", "traDo", "ghiChu"];
+var KHAU_TT = { nhanDo: "danhan", kiemDinh: "danhan", veSinh: "danhan", chupAnh: "danhan", ganTag: "danhan", lenKe: "lenke", daBan: "daban", traTien: "xong", traDo: "xong" };
+function maNgauNhien_(n) { var s = ""; while (s.length < n) s += Utilities.getUuid().replace(/-/g, ""); return s.slice(0, n).toLowerCase(); }
+function damBaoCot_(name, cols) {
+  var sh = ss().getSheetByName(name); if (!sh) return;
+  var head = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getDisplayValues()[0], thieu = cols.filter(function (c) { return head.indexOf(c) < 0; });
+  if (!thieu.length) return;
+  if (sh.getMaxColumns() < head.length + thieu.length) sh.insertColumnsAfter(sh.getMaxColumns(), head.length + thieu.length - sh.getMaxColumns());
+  sh.getRange(1, head.length + 1, 1, thieu.length).setValues([thieu]);
+}
+function dkCot_() { damBaoCot_("DangKy", ["theoDoi", "nhatTrinh", "giaChot", "noiO", "anhKH", "ai", "phuKien", "maHD", "uocTinh", "danhMuc", "phanKhuc", "hangKhach", "offer", "hdToken"]); }
+function soDep_(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+function khau_(b, extra) { var o = { b: b, luc: now("yyyy-MM-dd HH:mm") }; Object.keys(extra || {}).forEach(function (k) { if (extra[k] !== "" && extra[k] != null) o[k] = extra[k]; }); return o; }
+
+/* 1. Khách gửi yêu cầu định giá (không có CCCD, không hợp đồng) */
+function guiDinhGia(q) {
+  var p = phienOk(q.phien), sdt = sdtOk(q.sdt); if (!sdt) fail("Số Zalo chưa đúng (10 số, bắt đầu bằng 0)", "bad_request");
+  var ten = txt(q.ten, 80); if (ten.length < 2) fail("Nhập tên để tiệm xưng hô cho đúng", "bad_request");
+  if (!q.dong) fail("Cần đồng ý để tiệm liên hệ qua Zalo", "bad_request");
+  var anh = cuaPhien(p, q.anh, "sp"); if (anh.length < 3) fail("Cần ít nhất 3 ảnh món đồ", "bad_request");
+  rate("dg_" + sdt, 6, 86400);
+  var aiC = CacheService.getScriptCache().get("ai_" + p + "_kq"), cach = pick(q.cach, HINH, "ban");
+  dkCot_();
+  return withLock(function () {
+    var t = tab("DangKy"), id = nextMa(t.rows, "DK-" + now("ddMM") + "-"), td = maNgauNhien_(20);
+    var dk = { id: id, ten: ten, sdt: sdt, brand: txt(q.brand, 60), loai: txt(q.model, 80) || txt(q.danhMuc, 30), danhMuc: pick(q.danhMuc, DM, ""), phanKhuc: pick(q.phanKhuc, PKS, ""), hangKhach: pick(q.hang, ["A", "B", "C"], ""),
+      giaMua: num(q.giaMua), giaMuon: 0, giaSan: cach === "ban" ? num(q.giaSan) : 0, uocTinh: num(q.uocTinh), hinh: cach, bangChung: txt(q.bangChung, 60), noiO: txt(q.noiO, 60),
+      moTa: [txt(q.size, 30) ? "Size " + txt(q.size, 30) : "", txt(q.mau, 40), txt(q.namMua, 10) ? "Mua năm " + txt(q.namMua, 10) : "", txt(q.ghiChu, 600)].filter(String).join(" · "),
+      anhKH: { sp: anh, hd: cuaPhien(p, q.hdAnh, "hd") }, ai: aiC ? JSON.parse(aiC) : null, phuKien: (Array.isArray(q.phuKien) ? q.phuKien : []).slice(0, 8).map(function (x) { return txt(x, 40); }),
+      theoDoi: td, nhatTrinh: [khau_("guiDK", { ghiChu: "Giá ước tính trên web " + soDep_(num(q.uocTinh)) + "đ" })], ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
+    appendObj(t, dk);
+    log(null, "Yêu cầu định giá", id, dk.brand + " · " + cach);
+    return { ok: true, id: id, theoDoi: td };
+  });
+}
+
+/* 2. Nhân viên tạo (hoặc làm lại) link hợp đồng sau khi chốt giá */
+function taoHD(me, q) {
+  var id = txt(q.id, 30), d = q.dk || {};
+  var cach = pick(d.cach, HINH, "ban"), giaChot = num(d.giaChot); if (!giaChot) fail("Nhập giá chốt", "bad_request");
+  dkCot_(); tabCo("HopDong", HD_HEAD); damBaoCot_("HopDong", ["token", "dieuKhoan", "taoLuc", "taoBoi"]);
+  return withLock(function () {
+    var t = tab("DangKy"), r = find(t, "id", id); if (!r) fail("Không tìm thấy " + id, "not_found");
+    var x = toDoc(r), hd = tab("HopDong"), cu = hd.rows.filter(function (h) { return h.dangkyId === id && h.trangThai !== "Đã ký" && h.trangThai !== "Huỷ"; })[0];
+    var dieu = { brand: txt(d.brand || x.brand, 60), model: txt(d.model || x.loai, 80), dm: pick(d.dm || x.danhMuc, DM, "tui"), hang: pick(d.hang, ["A", "B", "C"], x.hangKhach || "B"), giaMua: num(d.giaMua || x.giaMua),
+      cach: cach, giaChot: giaChot, giaSan: cach === "ban" ? num(d.giaSan) : 0, size: txt(d.size, 30), mau: txt(d.mau, 40), namMua: txt(d.namMua, 10), phuKien: x.phuKien || [], bangChung: txt(d.bangChung || x.bangChung, 60),
+      ketQuaKiem: txt(d.ketQuaKiem, 600), soAnh: ((x.anhKH && x.anhKH.sp) || []).length, ten: x.ten, sdt: x.sdt };
+    var tok = cu ? cu.token : maNgauNhien_(24), maHD = cu ? cu.id : nextMa(hd.rows, "HD-" + now("ddMM") + "-");
+    if (cu) writeObj(hd, cu._r, { hinh: cach, dieuKhoan: dieu, taoLuc: now(), taoBoi: me.ten, trangThai: "Chờ ký" });
+    else { var row = { id: maHD, dangkyId: id, hinh: cach, sdt: x.sdt, hoTen: x.ten, trangThai: "Chờ ký", token: tok, dieuKhoan: JSON.stringify(dieu), taoLuc: now(), taoBoi: me.ten };
+      hd.sh.appendRow(hd.head.map(function (k) { return row[k] == null ? "" : cell(row[k]); })); }
+    var nt = (x.nhatTrinh || []).concat([khau_("taoHD", { nv: me.ten, ghiChu: "Giá chốt " + soDep_(giaChot) + "đ" })]);
+    writeObj(t, r._r, { maHD: maHD, hdToken: tok, giaChot: giaChot, offer: giaChot, hinh: cach, tt: "hd", nhatTrinh: nt, capNhat: now() });
+    log(me, "Tạo link hợp đồng", maHD, id + " · " + cach + " · " + giaChot);
+    return { ok: true, maHD: maHD, token: tok, theoDoi: x.theoDoi || "", doc: toDoc(find(tab("DangKy"), "id", id)) };
+  });
+}
+function hdTheoToken_(tok) {
+  tok = txt(tok, 40); if (!/^[a-z0-9]{20,40}$/.test(tok)) fail("Link hợp đồng không đúng", "not_found");
+  var hd = tab("HopDong"), r = find(hd, "token", tok); if (!r) fail("Link hợp đồng không đúng hoặc đã bị huỷ", "not_found");
+  return { hd: hd, r: r };
+}
+/* 3a. Khách mở link: xem điều khoản (không trả số CCCD, số tài khoản) */
+function xemHD(q) {
+  var o = hdTheoToken_(q.token), r = o.r, dk = find(tab("DangKy"), "id", r.dangkyId), dd = dk ? toDoc(dk) : {};
+  var dieu = {}; try { dieu = JSON.parse(String(r.dieuKhoan).replace(/^'/, "")); } catch (e) {}
+  return { ok: true, maHD: r.id, trangThai: r.trangThai, dk: dieu, theoDoi: dd.theoDoi || "", ngayKy: r.ngayKy || "" };
+}
+/* 3b. Khách ký qua link (online) hoặc nhân viên hỗ trợ tại quầy trên cùng link */
+function kyHD(q) {
+  var o = hdTheoToken_(q.token), r = o.r, p = String(r.token), h = q.hd || {};
+  if (r.trangThai === "Đã ký") fail("Hợp đồng này đã ký rồi", "bad_request");
+  var sdt = sdtOk(h.sdt); if (!sdt) fail("Số Zalo chưa đúng (10 số, bắt đầu bằng 0)", "bad_request");
+  var ten = txt(h.hoTen, 80); if (ten.length < 4) fail("Nhập họ tên đầy đủ", "bad_request");
+  var cccd = String(h.cccd || "").replace(/\D/g, ""); if (!/^\d{12}$/.test(cccd)) fail("Số CCCD gồm 12 chữ số", "bad_request");
+  if (!q.dongAnh) fail("Cần đồng ý xử lý ảnh giấy tờ", "bad_request");
+  var gt = pick(q.giayTo, ["cccd", "vneid"], "cccd"), cT = cuaPhien(p, [q.cccdT], "cccd")[0] || "", cS = cuaPhien(p, [q.cccdS], "cccd")[0] || "";
+  if (!cT || (gt === "cccd" && !cS)) fail(gt === "cccd" ? "Cần ảnh CCCD 2 mặt" : "Cần ảnh màn hình VNeID", "bad_request");
+  var ky = String(q.ky || ""); if (!/^data:image\/png;base64,/.test(ky) || ky.length > 600000) fail("Thiếu chữ ký", "bad_request");
+  var vb = String(q.vanBan || "").slice(0, 30000); if (vb.length < 500) fail("Thiếu nội dung hợp đồng", "bad_request");
+  rate("hd_" + sdt, 6, 86400);
+  var gio = now("yyyy-MM-dd HH:mm:ss"), hash = sha256(vb + "\n" + gio + "\n" + cccd);
+  var kyId = folderRieng("ky").createFile(Utilities.newBlob(Utilities.base64Decode(ky.split(",")[1]), "image/png", "chuky-" + r.id + ".png")).getId();
+  var vbId = folderRieng("vb").createFile(Utilities.newBlob(vb + "\n\n---\nKý lúc " + gio + " (giờ máy chủ, UTC+7) · SHA-256 " + hash + " · Phiên bản " + txt(q.phienBan, 20) + " · Thiết bị " + txt(q.ua, 200), "text/plain", "hopdong-" + r.id + ".txt")).getId();
+  return withLock(function () {
+    var hd = tab("HopDong"), rr = find(hd, "token", p);
+    writeObj(hd, rr._r, { ngayKy: now("yyyy-MM-dd"), gioMayChu: gio, phienBan: txt(q.phienBan, 20), hash: hash, hoTen: ten, ngaySinh: txt(h.ngaySinh, 10), cccd: cccd, diaChi: txt(h.diaChi, 200), sdt: sdt,
+      nganHang: txt(h.nganHang, 60), soTK: txt(h.soTK, 30).replace(/\s/g, ""), chuTK: txt(h.chuTK, 80), cccdTruoc: cT, cccdSau: cS, dongYAnh: "Có · " + (gt === "vneid" ? "VNeID" : "CCCD") + (q.docTu === "qr" ? " · đọc QR" : q.docTu === "ai" ? " · AI đọc" : ""),
+      chuKy: kyId, vanBan: vbId, thietBi: txt(q.ua, 200), phien: p, trangThai: "Đã ký" });
+    var t = tab("DangKy"), d = find(t, "id", rr.dangkyId), td = "";
+    if (d) { var x = toDoc(d); td = x.theoDoi; writeObj(t, d._r, { tt: "daky", nhatTrinh: (x.nhatTrinh || []).concat([khau_("kyHD", { ghiChu: "Hợp đồng " + rr.id })]), capNhat: now() }); }
+    log(null, "Ký hợp đồng", rr.id, rr.dangkyId);
+    return { ok: true, maHD: rr.id, hash: hash, theoDoi: td };
+  });
+}
+/* 4. Nhân viên ghi một khâu (kèm ảnh, ghi chú, số tiền, mã món) */
+function themKhau(me, q) {
+  var id = txt(q.id, 30), b = pick(q.b, KHAU, ""); if (!b || ["guiDK", "taoHD", "kyHD"].indexOf(b) > -1) fail("Chọn khâu", "bad_request");
+  dkCot_();
+  return withLock(function () {
+    var t = tab("DangKy"), r = find(t, "id", id); if (!r) fail("Không tìm thấy " + id, "not_found");
+    var x = toDoc(r), e = khau_(b, { nv: me.ten, ghiChu: txt(q.ghiChu, 400), anh: (Array.isArray(q.anh) ? q.anh : []).slice(0, 8).map(function (a) { return txt(a, 80); }), so: num(q.so), ma: txt(q.ma, 30), dat: q.dat === false ? "khong" : "" });
+    if (!e.anh.length) delete e.anh;
+    var w = { nhatTrinh: (x.nhatTrinh || []).concat([e]).slice(-60), capNhat: now() };
+    if (KHAU_TT[b]) w.tt = KHAU_TT[b];
+    if (b === "kiemDinh" && q.dat === false) w.tt = "khongdat";
+    writeObj(t, r._r, w);
+    log(me, "Khâu " + b, id, txt(q.ghiChu, 120));
+    var nx = toDoc(find(tab("DangKy"), "id", id));
+    return { ok: true, doc: nx };
+  });
+}
+/* 5. Khách theo dõi: chỉ thông tin món, các khâu, ảnh khâu (ảnh sản phẩm công khai), quy tắc nhận tiền */
+function theoDoiKH(q) {
+  var tok = txt(q.token, 40); if (!/^[a-z0-9]{16,40}$/.test(tok)) fail("Link theo dõi không đúng", "not_found");
+  rate("td_" + tok, 120, 3600);
+  var r = find(tab("DangKy"), "theoDoi", tok); if (!r) fail("Link theo dõi không đúng", "not_found");
+  var x = toDoc(r), hdLink = "";
+  if (x.tt === "hd") { try { var h = tab("HopDong").rows.filter(function (y) { return y.dangkyId === x.id && y.trangThai === "Chờ ký"; })[0]; if (h) hdLink = h.token; } catch (e) {} }
+  return { ok: true, dk: { id: x.id, ten: x.ten, brand: x.brand, loai: x.loai, danhMuc: x.danhMuc, hinh: x.hinh, uocTinh: x.uocTinh, giaChot: x.giaChot, maHD: x.maHD, tt: x.tt, ngay: x.ngay, nhatTrinh: x.nhatTrinh || [] }, hdToken: hdLink };
 }
