@@ -36,7 +36,7 @@ function soGio(iso){ return iso?Math.floor((Date.now()-Date.parse(iso))/36e5):0;
 
 /* ===================== TRẠNG THÁI ===================== */
 const S={mon:[],don:[],dangky:[],thue:[],dathang:[],db:null,assets:null,sample:null,aiImg:false,user:null,canWrite:null,ready:false,
-  shop:{dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""}, cart:[], kho:{tt:"dang",q:"",sort:"moi",chon:new Set(),chonMode:false}, chu:{seg:"all"}, W:null};
+  shop:{hieu:"all",dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""}, cart:[], kho:{tt:"dang",q:"",sort:"moi",chon:new Set(),chonMode:false}, chu:{seg:"all"}, W:null};
 try{ S.cart=JSON.parse(localStorage.getItem("seconde-gio")||"[]")||[]; }catch(e){ S.cart=[]; }
 function luuGio(){ try{ localStorage.setItem("seconde-gio",JSON.stringify(S.cart)); }catch(e){} }
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -308,8 +308,7 @@ function dangTai(B){ return B.anh.some(a=>!a.id&&!a.loi); }
 /* 1. Ảnh */
 function b1(B){ const ok=anhXong(B);
   return `<section class="card stack"><h2>Chụp ảnh món đồ</h2>
-   <p class="small muted" style="margin:0">Cần ${ANH_MIN}–${ANH_MAX} ảnh, chụp rõ, đủ sáng, nền trơn. AI xem ${AI_ANH} ảnh đầu để nhận diện thương hiệu, mẫu và tình trạng, nên chụp theo thứ tự dưới đây. Ảnh chỉ tiệm xem được.</p>
-   <ol class="shots">${ANH_GOI_Y.map((t,i)=>`<li class="${ok>i?"ok":""}">${esc(t)}</li>`).join("")}</ol>
+   <p class="small muted" style="margin:0">Cần ${ANH_MIN}–${ANH_MAX} ảnh rõ, đủ sáng. Nên có một ảnh logo hoặc tem bên trong để AI nhận đúng hãng. Ảnh chỉ tiệm xem được.</p>
    <div class="thumbs" id="bThumbs">${B.anh.map((a,i)=>`<div class="t"><div class="ph"><img src="${a.url}" alt="Ảnh ${i+1}">${a.id?`<span class="so">${i+1}</span>`:`<span class="upl">${a.loi?"Lỗi":"Đang tải…"}</span>`}</div><button type="button" data-a="bBoAnh" data-v="${i}" aria-label="Bỏ ảnh ${i+1}">×</button></div>`).join("")}
     ${B.anh.length<ANH_MAX?`<label class="drop tile">${ico("plus2")}<b>${B.anh.length?"Thêm ảnh":"Chụp hoặc chọn ảnh"}</b><span class="small muted">${B.anh.length}/${ANH_MAX}</span><input type="file" id="bFile" accept="image/*" multiple></label>`:""}</div>
    ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${kiemBuoc(B)?"":"disabled"}>Tiếp: AI điền thông tin</button>`,lyDoChua(B))}</section>`; }
