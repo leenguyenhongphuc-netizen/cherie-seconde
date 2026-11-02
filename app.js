@@ -4,7 +4,8 @@ const HANG={A:{pct:.35,ten:"Hạng A",mo:"Như mới"},B:{pct:.24,ten:"Hạng B"
 const TRAN_SALE=.70, GIA_TOI_THIEU=300000, HAN_NGAY=60, PHI_SHOPEE=.253, THUE_ROI_MUA=.45, CHIA_THUE=.5, ZALO="0377159189";
 const KENH=["Web / Zalo","Instagram","Livestream","Shopee","Tại tiệm","Thuê rồi mua"];
 const TT={cho:"Chờ đăng",dang:"Đang bán",giu:"Khách giữ",ban:"Đã bán",thue:"Cho thuê",tra:"Đã trả chủ đồ"};
-const NGUON={cherie:"Đầm CHÉRIE",kygui:"Ký gửi bán",kyguithue:"Ký gửi cho thuê"};
+const NGUON={cherie:"Đầm CHÉRIE",mualai:"Tiệm mua lại",kygui:"Ký gửi bán",kyguithue:"Ký gửi cho thuê"};
+function laKG(m){ return !!m&&(m.nguon==="kygui"||m.nguon==="kyguithue"); }
 const LOI=[["vet","Vết bẩn khó"],["sut","Sút chỉ, bung đường may"],["phai","Phai, xỉn màu"],["xu","Xù, sờn vải"],["cuc","Thiếu cúc, hỏng khoá"],["mui","Mùi, ố vàng"]];
 const TOT=[["tag","Còn tag hãng"],["hoadon","Có hóa đơn / bằng chứng mua"],["giat","Đã giặt hấp qua Care"],["form","Giữ form, không giãn"]];
 
@@ -12,7 +13,7 @@ function tyLeHH(g,r){ if(r!=null&&r!==""&&!isNaN(r)) return Number(r); return g<
 function tron(n){ return Math.floor((Number(n)||0)/1000)*1000; }
 function giaGoiY(m){ const ny=Number(m.giaNiemYet)||0; let g=ny*(HANG[m.hang]||HANG.B).pct; if(Number(m.giaSale)>0) g=Math.min(g,Number(m.giaSale)*TRAN_SALE); return tron(g); }
 function heSo(n){ return n>=45?.65:(n>=30?.80:1); }
-function giaNay(m,t){ const goc=Number(m.giaDang)||0; if(!m.ngayDang) return goc; let g=tron(goc*heSo(soNgay(m.ngayDang,t||homNay()))); if(m.nguon!=="cherie"&&Number(m.giaSan)>0) g=Math.max(g,Number(m.giaSan)); return g; }
+function giaNay(m,t){ const goc=Number(m.giaDang)||0; if(!m.ngayDang) return goc; let g=tron(goc*heSo(soNgay(m.ngayDang,t||homNay()))); if(laKG(m)&&Number(m.giaSan)>0) g=Math.max(g,Number(m.giaSan)); return g; }
 function lanGiamToi(m,t){ if(!m.ngayDang) return null; const n=soNgay(m.ngayDang,t); if(n<30) return {ngay:cong(m.ngayDang,30),con:30-n,he:.8}; if(n<45) return {ngay:cong(m.ngayDang,45),con:45-n,he:.65}; return null; }
 function hangGoiY(c,luot){ const loi=LOI.some(([k])=>c[k]); if(loi) return "C"; if(c.tag||Number(luot)<=2) return "A"; return "B"; }
 /* ngày */
@@ -35,7 +36,7 @@ function soGio(iso){ return iso?Math.floor((Date.now()-Date.parse(iso))/36e5):0;
 
 /* ===================== TRẠNG THÁI ===================== */
 const S={mon:[],don:[],dangky:[],thue:[],dathang:[],db:null,assets:null,sample:null,aiImg:false,user:null,canWrite:null,ready:false,
-  shop:{cat:"all",hang:"all",size:"all",sort:"moi",q:""}, cart:[], kho:{tt:"dang",q:"",sort:"moi",chon:new Set(),chonMode:false}, chu:{seg:"all"}, W:null};
+  shop:{dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""}, cart:[], kho:{tt:"dang",q:"",sort:"moi",chon:new Set(),chonMode:false}, chu:{seg:"all"}, W:null};
 try{ S.cart=JSON.parse(localStorage.getItem("seconde-gio")||"[]")||[]; }catch(e){ S.cart=[]; }
 function luuGio(){ try{ localStorage.setItem("seconde-gio",JSON.stringify(S.cart)); }catch(e){} }
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -49,9 +50,9 @@ function phHtml(m,cls){ const a=(m.anh||[])[0]; return `<div class="ph ${cls||""
 function lichSu(m,viec){ return (m.lichSu||[]).concat([{n:homNay(),v:viec}]).slice(-30); }
 
 /* ===================== ĐIỀU HƯỚNG ===================== */
-const SHOP=["cua-hang","ky-gui"], ADM=["quan-tri","qt-nhan","qt-kho","qt-don","qt-chu"];
+const ADM=["quan-tri","qt-nhan","qt-kho","qt-don","qt-chu"];
 const MODE=window.SC_MODE==="adm"?"adm":"shop";
-function hienTai(){ const h=(location.hash||"").slice(1); return MODE==="adm"?(ADM.includes(h)?h:"quan-tri"):(SHOP.includes(h)?h:"cua-hang"); }
+function hienTai(){ const h=(location.hash||"").slice(1); return MODE==="adm"?(ADM.includes(h)?h:"quan-tri"):trangShop(); }
 function laAdmin(){ return MODE==="adm"; }
 let lastShell="";
 function render(){ const v=hienTai(), shell=laAdmin()?"adm":"shop";
@@ -61,143 +62,297 @@ let hen=0; function veLai(){ cancelAnimationFrame(hen); hen=requestAnimationFram
 window.addEventListener("hashchange",()=>{ closeSheet(); render(); window.scrollTo({top:0}); });
 
 /* =================================================================
-   CỬA HÀNG (khách)
+   CỬA HÀNG (khách) — kiểu sàn: hai việc tách rõ
+   1) MUA đồ đã qua sử dụng theo danh mục và phân khúc (tầm trung → luxury)
+   2) BÁN & KÝ GỬI: báo giá tức thì, chọn cách nhận tiền
    ================================================================= */
+const DM=[["dam","Đầm dự tiệc"],["congso","Đồ công sở"],["ao","Áo & chân váy"],["tui","Túi xách"],["giay","Giày"],["phukien","Phụ kiện"]];
+const PK={tamtrung:{ten:"Tầm trung",mo:"Thương hiệu Việt và quốc tế phổ thông"},caocap:{ten:"Cao cấp",mo:"Designer Việt, contemporary"},luxury:{ten:"Luxury",mo:"Hàng hiệu đã kiểm định nguồn gốc"}};
+const LUX=["chanel","hermès","hermes","louis vuitton","dior","gucci","prada","celine","céline","fendi","bottega","saint laurent","ysl","balenciaga","givenchy","valentino","loewe","burberry","miu miu","chloé","chloe","versace","cartier","bvlgari","tiffany","goyard","jimmy choo","manolo"];
+const CAOCAP=["sixdo","nem","elise","d.chic","coach","kate spade","michael kors","tory burch","furla","longchamp","massimo dutti","cos","sandro","maje","ted baker","self-portrait","reformation","charles & keith","pedro","marc jacobs","calvin klein","ralph lauren","lacoste"];
+/* Báo giá tức thì [GĐ]: giá bán lại dự kiến = % giá mua theo phân khúc và hạng; tiệm mua đứt = % giá bán dự kiến; tín dụng cộng thêm. */
+const UOC={tamtrung:{A:.30,B:.22,C:.12},caocap:{A:.40,B:.30,C:.18},luxury:{A:.65,B:.55,C:.40}};
+const MUA_DUT={tamtrung:.40,caocap:.45,luxury:.60};
+const TIN_DUNG=1.20;
+const GIA_THUE=[130000,260000];
+function phanKhuc(m){ if(m.phanKhuc&&PK[m.phanKhuc]) return m.phanKhuc; const b=String(m.brand||"").toLowerCase().trim(); if(b&&LUX.some(x=>b.includes(x))) return "luxury";
+  const ny=Number(m.giaNiemYet)||0; if(ny>=20000000) return "luxury"; if((b&&CAOCAP.some(x=>b.includes(x)))||ny>=3000000) return "caocap"; return "tamtrung"; }
+function danhMuc(m){ if(m.danhMuc&&DM.some(d=>d[0]===m.danhMuc)) return m.danhMuc; const s=(String(m.loai||"")+" "+String(m.ten||"")).toLowerCase();
+  if(/túi|\bbag\b|ví|clutch|balo/.test(s)) return "tui"; if(/giày|sandal|cao gót|boot|sneaker|dép/.test(s)) return "giay"; if(/khăn|bông tai|vòng|kính|thắt lưng|phụ kiện|trang sức|nón|mũ/.test(s)) return "phukien";
+  if(/vest|blazer|công sở|sơ mi|quần/.test(s)) return "congso"; if(/áo|chân váy|croptop/.test(s)) return "ao"; return "dam"; }
+function tenDM(k){ const d=DM.find(x=>x[0]===k); return d?d[1]:"Tất cả"; }
+function uocTinh(o){ const pk=phanKhuc({brand:o.brand,giaNiemYet:o.giaMua}); const p=(UOC[pk]||UOC.tamtrung)[o.hang||"B"]; const giua=tron((Number(o.giaMua)||0)*p); return {pk,giua,thap:tron(giua*.9),cao:tron(giua*1.1)}; }
+
+let THICH=new Set(); try{ THICH=new Set(JSON.parse(localStorage.getItem("seconde-thich")||"[]")); }catch(e){}
+function luuThich(){ try{ localStorage.setItem("seconde-thich",JSON.stringify([...THICH])); }catch(e){} }
+
+const SV={dam:'<path d="M9.5 3h5l-.8 4.2L18 20H6l4.3-12.8z"/><path d="M10.2 7.2h3.6"/>',congso:'<path d="M8 3.5l4 3.5 4-3.5 3.5 2.5-1.8 4H16V20H8v-10H6.3L4.5 6z"/><path d="M12 7v13"/>',
+ ao:'<path d="M8.5 4l3.5 2 3.5-2 3 3-2 2.5h-1V12h-7V9.5h-1l-2-2.5z"/><path d="M8.5 13.5h7l2.5 7H6z"/>',tui:'<path d="M5 9h14l-1.2 11H6.2z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/>',
+ giay:'<path d="M3.5 17.5c3 0 5.5-5.5 6.5-9 1.2 3 3.8 5 7 5.8l3.5.9v2.3z"/><path d="M6 17.5V21"/>',phukien:'<circle cx="12" cy="14" r="5"/><path d="M12 4v5M9.5 4h5"/>',
+ luxury:'<path d="M12 3.5l2.4 5.3 5.6.6-4.2 3.8 1.2 5.6L12 16l-5 2.8 1.2-5.6L4 9.4l5.6-.6z"/>',giam:'<path d="M3.5 12.5l8.5-8.5h8v8l-8.5 8.5z"/><circle cx="15.5" cy="8.5" r="1.4"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+ cart:'<path d="M3.5 4.5h2.3l2 11h10.5l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>',menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ left:'<path d="M15 5l-7 7 7 7"/>',right:'<path d="M9 5l7 7-7 7"/>',shield:'<path d="M12 3l7 3v5c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+ cash:'<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.5"/>',clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+ swap:'<path d="M5 8h13l-3-3M19 16H6l3 3"/>',rent:'<path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/>'};
+function ico(k,cls){ return `<svg class="${cls||"ico"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SV[k]||""}</svg>`; }
+
 function shopShell(){ return `
- <div class="annc gut"><span>Giặt hấp chuẩn CHÉRIE Care · Ảnh tình trạng thật · Giao toàn quốc · Đổi trả 3 ngày</span></div>
+ <div class="annc gut"><span>Mỗi món qua xưởng CHÉRIE Care giặt hấp và kiểm định · Giao toàn quốc · Đổi trả 3 ngày</span></div>
  <header class="shead"><div class="in max gut">
-   <a class="word" href="#cua-hang">CHÉRIE<em>Seconde</em></a>
-   <div class="snav-wrap"><nav class="snav" id="snav"></nav></div>
-   <div class="ssearch"><input id="sq" type="search" placeholder="Tìm thương hiệu, kiểu đầm, màu…" aria-label="Tìm sản phẩm"></div>
-   <button class="cartbtn" data-a="gio">Giỏ<b id="cartN">0</b></button>
- </div></header>
- <main id="smain"></main>`; }
-function renderShop(v){
-  document.getElementById("snav").innerHTML=[["cua-hang","all","Tất cả"],["cua-hang","cherie","Đầm CHÉRIE"],["cua-hang","kygui","Đồ ký gửi"],["cua-hang","giam","Đang giảm giá"],["ky-gui","","Ký gửi đồ"]]
-    .map(([h,c,t])=>`<a href="#${h}" data-a="cat" data-v="${c}" aria-current="${(v===h&&(h==="ky-gui"||S.shop.cat===c))?"page":"false"}">${t}</a>`).join("");
-  document.getElementById("cartN").textContent=gioHop().length;
-  const q=document.getElementById("sq"); if(q&&!q._b){ q._b=1; q.value=S.shop.q; q.addEventListener("input",()=>{ S.shop.q=q.value; if(hienTai()!=="cua-hang") location.hash="cua-hang"; else veSP(); }); }
+   <a class="word" href="#">CHÉRIE<em>Seconde</em></a>
+   <button class="catbtn" data-a="menuDM" aria-label="Danh mục">${ico("menu")}<span>Danh mục</span></button>
+   <form class="ssearch" id="fTim" role="search"><input id="sq" type="search" placeholder="Tìm Chanel, đầm lụa, túi Coach…" aria-label="Tìm sản phẩm" autocomplete="off"><button type="submit" aria-label="Tìm">${ico("search")}</button></form>
+   <nav class="sact" aria-label="Tài khoản"><a class="sellbtn" href="#ban">Bán & ký gửi</a>
+     <a class="icbtn" href="#yeu-thich" aria-label="Yêu thích">${ico("heart")}<b id="thichN" hidden></b></a>
+     <button class="icbtn" data-a="gio" aria-label="Giỏ hàng">${ico("cart")}<b id="cartN" hidden></b></button></nav>
+ </div><div class="subnav-w"><nav class="subnav max gut" id="subnav" aria-label="Danh mục chính"></nav></div></header>
+ <main id="smain"></main>
+ <footer class="sfoot2"><div class="max gut fcols">
+   <div><a class="word" href="#">CHÉRIE<em>Seconde</em></a><p>Đồ hiệu đã qua sử dụng, giặt hấp và kiểm định tại Đà Nẵng. Một nhánh của CHÉRIE.</p><p class="tag2">Mỗi lần, một chiếc mới.</p></div>
+   <div><b>Mua</b><a href="#mua" data-a="loc" data-k="reset">Tất cả món</a><a href="#mua" data-a="loc" data-k="pk" data-v="luxury">Luxury</a><a href="#mua" data-a="loc" data-k="giam" data-v="1">Đang giảm giá</a><a href="#yeu-thich">Yêu thích</a></div>
+   <div><b>Bán</b><a href="#ban">Báo giá & ký gửi</a><a href="#ban" data-a="goSell" data-v="bandut">Bán đứt lấy tiền ngay</a><a href="#ban" data-a="goSell" data-v="tindung">Đổi tín dụng CHÉRIE</a><a href="#tra-cuu">Tra cứu đồ ký gửi</a></div>
+   <div><b>Liên hệ</b><span>Zalo <span class="num" style="user-select:all">${ZALO}</span></span><span>Giao nhận Đà Nẵng thứ 2, thứ 6</span><span>Thanh toán VietQR</span></div>
+ </div></footer>`; }
+
+const SHOP_R=["trang-chu","mua","ban","tra-cuu","yeu-thich"];
+function trangShop(){ const h=(location.hash||"").slice(1); if(h.startsWith("sp-")) return h; return SHOP_R.includes(h)?h:"trang-chu"; }
+function renderShop(){ const r=trangShop();
+  const f=S.shop, sub=[["dm","dam","Đầm dự tiệc"],["dm","congso","Công sở"],["dm","tui","Túi xách"],["dm","giay","Giày"],["dm","phukien","Phụ kiện"],["pk","luxury","Luxury"],["giam","1","Đang giảm giá"]];
+  document.getElementById("subnav").innerHTML=sub.map(([k,v,t])=>`<a href="#mua" data-a="loc" data-k="${k}" data-v="${v}" aria-current="${r==="mua"&&String(f[k])===v&&laLocDon(k)?"page":"false"}">${t}</a>`).join("")
+    +`<a href="#ban" class="sell" aria-current="${r==="ban"?"page":"false"}">Bán đồ của bạn</a>`;
+  const n=gioHop().length, c=document.getElementById("cartN"); c.textContent=n; c.hidden=!n;
+  const tn=[...THICH].filter(id=>S.mon.some(m=>m.id===id&&m.tt==="dang")).length, th=document.getElementById("thichN"); th.textContent=tn; th.hidden=!tn;
+  const q=document.getElementById("sq"); if(!q._b){ q._b=1; q.value=f.q; document.getElementById("fTim").addEventListener("submit",ev=>{ ev.preventDefault(); datLoc({q:q.value.trim()}); }); }
   const hh=document.querySelector(".shead"); if(hh) document.documentElement.style.setProperty("--hh",hh.offsetHeight+"px");
-  if(v==="ky-gui") renderKyGui(); else renderCuaHang();
-  if(sheetOpen()&&document.getElementById("cartPanel")) veGio();
-}
+  if(r.startsWith("sp-")) veSanPham(r.slice(3)); else ({"trang-chu":veTrangChu,mua:veMua,ban:veBan,"tra-cuu":veTraCuu,"yeu-thich":veThich})[r]();
+  if(sheetOpen()&&document.getElementById("cartPanel")) veGio(); }
+const LOC0={dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""};
+function laLocDon(k){ const f=S.shop; return Object.keys(LOC0).filter(x=>x!=="sort"&&x!==k).every(x=>f[x]===LOC0[x]); }
+function datLoc(o){ S.shop=Object.assign({},LOC0,o); const q=document.getElementById("sq"); if(q) q.value=S.shop.q; if(location.hash==="#mua"){ document.getElementById("smain").dataset.p=""; veLai(); window.scrollTo({top:0}); } else location.hash="mua"; }
 function dsBan(){ return S.mon.filter(m=>m.tt==="dang"&&m.nguon!=="kyguithue"); }
 function gioHop(){ const ids=new Set(dsBan().map(m=>m.id)); return S.cart.filter(id=>ids.has(id)); }
-function renderCuaHang(){
-  const el=document.getElementById("smain"); if(!document.getElementById("spList")){
-  el.innerHTML=`<div class="max gut">
-   <section class="hero"><div><div class="eyebrow">Secondhand thương hiệu Việt & luxury</div>
-     <h1>Đầm đẹp đã qua một mùa tiệc, giá chỉ bằng một phần.</h1>
-     <p>Mỗi món qua xưởng CHÉRIE Care giặt hấp và kiểm từng đường may. Hạng A, B, C và mọi lỗi nhỏ đều ghi rõ, kèm ảnh thật.</p></div>
-     <div class="usp"><div><b>Rẻ hơn giá hãng 60–80%</b>Giá gốc in cạnh giá bán</div><div><b>Ảnh tình trạng thật</b>4 góc, không dùng ảnh hãng</div>
-       <div><b>Đổi trả 3 ngày</b>Không vừa thì gửi lại</div><div><b>Giao toàn quốc</b>Đà Nẵng giao thứ 2, thứ 6</div></div></section>
-   <div class="toolbar" id="spBar"></div><div id="spList"></div>
-   <section class="trust"><div><b>Kiểm định nguồn gốc</b>Chỉ nhận hàng có hóa đơn, tag hoặc bằng chứng mua.</div><div><b>Phân hạng minh bạch</b>A như mới, B đã mặc còn đẹp, C có lỗi nhỏ ghi rõ.</div>
-     <div><b>Thanh toán VietQR</b>Chuyển khoản đúng tên tiệm, có biên nhận.</div><div><b>Có đồ đẹp muốn bán?</b><a href="#ky-gui">Ký gửi cùng CHÉRIE</a>, nhận tiền sau 3 ngày làm việc.</div></section>
-  </div>${footer()}`; }
-  veSP();
-}
-function footer(){ return `<footer class="max gut sfoot"><div><b style="color:var(--ink)">CHÉRIE Seconde</b><br>Một nhánh của CHÉRIE · Đà Nẵng</div><div>Zalo đặt hàng: <span class="num" style="user-select:all">${ZALO}</span></div><div>Mỗi lần, một chiếc mới.</div></footer>`; }
+function dangGiam(m,t){ return m.ngayDang&&heSo(soNgay(m.ngayDang,t))<1; }
+function card(m,t){ const g=giaNay(m,t),ny=Number(m.giaNiemYet)||0,off=ny>g?Math.round((1-g/ny)*100):0,pk=phanKhuc(m);
+  return `<article class="pcard"><div class="media"><a class="imgbtn" href="#sp-${esc(m.id)}" aria-label="${esc(m.ten)}">${phHtml(m)}</a>
+    <button class="heart" data-a="thich" data-id="${esc(m.id)}" aria-pressed="${THICH.has(m.id)}" aria-label="Yêu thích">${ico("heart")}</button>
+    ${pk==="luxury"?`<span class="tag lux">Luxury · đã kiểm định</span>`:dangGiam(m,t)?`<span class="tag sale">Đang giảm</span>`:""}</div>
+    <a class="nm" href="#sp-${esc(m.id)}">${esc(m.ten)}</a>
+    <div class="seller">${esc(m.brand||"")}${m.size?" · Size "+esc(m.size):""} · <span class="hg ${m.hang}">Hạng ${m.hang}</span></div>
+    <div class="price"><b class="num">${vnd(g)}</b>${off?`<s class="num">${vnd(ny)}</s><span class="off num">(−${off}%)</span>`:""}</div></article>`; }
+function luoi(l,t,trong){ return l.length?`<div class="grid">${l.map(m=>card(m,t)).join("")}</div>`:trong; }
+function trongKe(){ return `<div class="empty"><b>${S.ready?"Kệ đang được làm mới":"Đang tải sản phẩm…"}</b>${S.ready?`Món mới lên kệ mỗi tuần. Nhắn Zalo <span class="num">${ZALO}</span> để được báo trước, hoặc <a href="#ban">bán đồ của bạn cho CHÉRIE</a>.`:""}</div>`; }
+
+/* ---------- Trang chủ ---------- */
+function veTrangChu(){ const el=document.getElementById("smain"), t=homNay();
+  if(el.dataset.p!=="trang-chu"){ el.dataset.p="trang-chu";
+  el.innerHTML=`<section class="band"><div class="max gut duo">
+    <div class="mission"><div class="eyebrow">Mua</div><h1>Đồ hiệu đã qua sử dụng, giặt hấp và kiểm định sẵn.</h1>
+      <p>Từ đầm thương hiệu Việt đến túi luxury. Hạng A, B, C ghi rõ, ảnh tình trạng thật, đổi trả 3 ngày.</p>
+      <div class="row"><a class="btn light" href="#mua" data-a="loc" data-k="reset">Mua sắm ngay</a><a class="btn ghost" href="#mua" data-a="loc" data-k="pk" data-v="luxury">Xem Luxury</a></div></div>
+    <form class="mission sell" id="fQ"><div class="eyebrow">Bán</div><h2>Tủ đồ đẹp nằm yên thì tiếc.</h2>
+      <p>Nhập món bạn muốn bán, xem ngay bạn nhận được bao nhiêu với 4 cách bán.</p>
+      <div class="qq"><input id="qBrand" placeholder="Thương hiệu, ví dụ Coach" list="dsBrandKH" aria-label="Thương hiệu"><input id="qGia" inputmode="numeric" placeholder="Giá mua lúc đầu" aria-label="Giá mua lúc đầu"><button class="btn light" type="submit">Xem báo giá</button></div>
+      <datalist id="dsBrandKH">${LUX.concat(CAOCAP).filter(x=>x.length>3).map(x=>`<option value="${esc(x.replace(/\b\w/g,c=>c.toUpperCase()))}">`).join("")}</datalist></form>
+  </div></section>
+  <section class="max gut cats" aria-label="Danh mục">${DM.map(([k,tx])=>`<a href="#mua" data-a="loc" data-k="dm" data-v="${k}" class="cat"><span class="circ">${ico(k,"cico")}</span><span>${tx}</span></a>`).join("")}
+    <a href="#mua" data-a="loc" data-k="pk" data-v="luxury" class="cat"><span class="circ lux">${ico("luxury","cico")}</span><span>Luxury</span></a>
+    <a href="#mua" data-a="loc" data-k="giam" data-v="1" class="cat"><span class="circ">${ico("giam","cico")}</span><span>Đang giảm giá</span></a></section>
+  <section class="max gut sect"><div class="sh"><h2>Mua theo phân khúc</h2></div><div class="tiers3" id="hPK"></div></section>
+  <section class="max gut sect"><div class="sh"><h2>Mới lên kệ</h2><a href="#mua" data-a="loc" data-k="reset">Xem tất cả →</a></div><div id="hMoi"></div></section>
+  <section class="max gut sect" id="hGiamW"><div class="sh"><h2>Đang giảm giá</h2><a href="#mua" data-a="loc" data-k="giam" data-v="1">Xem tất cả →</a></div><div id="hGiam"></div></section>
+  <section class="max gut sect"><div class="why">
+    <div>${ico("shield","wico")}<b>Kiểm định nguồn gốc</b>Chỉ nhận hàng có hóa đơn, tag hoặc bằng chứng mua. Hàng giả bị từ chối.</div>
+    <div>${ico("swap","wico")}<b>Phân hạng minh bạch</b>A như mới, B đã mặc còn đẹp, C có lỗi nhỏ ghi rõ kèm ảnh.</div>
+    <div>${ico("clock","wico")}<b>Giữ hàng 24 giờ</b>Đặt trên web, tiệm nhắn Zalo gửi mã VietQR, có biên nhận.</div>
+    <div>${ico("cash","wico")}<b>Đổi trả 3 ngày</b>Không vừa, gửi lại trong 3 ngày kể từ khi nhận.</div></div></section>
+  <section class="max gut sect"><div class="sellband"><div><div class="eyebrow">Bán cùng CHÉRIE</div><h2>Bốn cách bán, bạn chọn cách có lợi nhất.</h2></div>
+    <div class="ways">${CACH.map(c=>`<a href="#ban" data-a="goSell" data-v="${c.k}">${ico(c.ic,"wico")}<b>${c.ten}</b><span>${c.ngan}</span></a>`).join("")}</div></div></section>`;
+  document.getElementById("fQ").addEventListener("submit",ev=>{ ev.preventDefault(); S.ban=Object.assign(S.ban||{},{brand:val("qBrand").trim(),giaMua:tien(val("qGia"))}); location.hash="ban"; }); }
+  const ds=dsBan();
+  document.getElementById("hPK").innerHTML=Object.entries(PK).map(([k,p])=>{ const l=ds.filter(m=>phanKhuc(m)===k); const mn=l.length?Math.min(...l.map(m=>giaNay(m,t))):0;
+    return `<a href="#mua" data-a="loc" data-k="pk" data-v="${k}" class="tier ${k}"><b>${p.ten}</b><span>${p.mo}</span><em class="num">${l.length?`${l.length} món · từ ${vnd(mn)}`:"Sắp lên kệ"}</em></a>`; }).join("");
+  const moi=ds.slice().sort((a,b)=>String(b.ngayDang).localeCompare(String(a.ngayDang))).slice(0,8);
+  document.getElementById("hMoi").innerHTML=luoi(moi,t,trongKe());
+  const gi=ds.filter(m=>dangGiam(m,t)).slice(0,4); document.getElementById("hGiamW").hidden=!gi.length; document.getElementById("hGiam").innerHTML=luoi(gi,t,""); }
+
+/* ---------- Mua: duyệt và lọc ---------- */
+const GIA_KHOANG={all:["Mọi mức giá",0,1e15],d1:["Dưới 1 triệu",0,999999],d3:["1 – 3 triệu",1e6,3e6],d10:["3 – 10 triệu",3000001,1e7],t10:["Trên 10 triệu",10000001,1e15]};
 function locSP(){ const f=S.shop,t=homNay(),q=f.q.trim().toLowerCase(); let l=dsBan();
-  if(f.cat==="cherie") l=l.filter(m=>m.nguon==="cherie"); if(f.cat==="kygui") l=l.filter(m=>m.nguon!=="cherie"); if(f.cat==="giam") l=l.filter(m=>m.ngayDang&&heSo(soNgay(m.ngayDang,t))<1);
+  if(f.dm!=="all") l=l.filter(m=>danhMuc(m)===f.dm); if(f.pk!=="all") l=l.filter(m=>phanKhuc(m)===f.pk);
   if(f.hang!=="all") l=l.filter(m=>m.hang===f.hang); if(f.size!=="all") l=l.filter(m=>m.size===f.size);
-  if(q) l=l.filter(m=>[m.ten,m.brand,m.mau,m.loai,m.moTa].join(" ").toLowerCase().includes(q));
+  if(f.nguon==="cherie") l=l.filter(m=>!laKG(m)); if(f.nguon==="kygui") l=l.filter(m=>laKG(m)); if(f.giam) l=l.filter(m=>dangGiam(m,t));
+  const gk=GIA_KHOANG[f.gia]||GIA_KHOANG.all; l=l.filter(m=>{ const g=giaNay(m,t); return g>=gk[1]&&g<=gk[2]; });
+  if(q) l=l.filter(m=>[m.ten,m.brand,m.mau,m.loai,m.moTa,m.chatLieu,tenDM(danhMuc(m)),PK[phanKhuc(m)].ten].join(" ").toLowerCase().includes(q));
   const s=f.sort; l.sort((a,b)=>s==="tang"?giaNay(a,t)-giaNay(b,t):s==="giam"?giaNay(b,t)-giaNay(a,t):s==="re"?(1-giaNay(b,t)/(b.giaNiemYet||1e12))-(1-giaNay(a,t)/(a.giaNiemYet||1e12)):String(b.ngayDang).localeCompare(String(a.ngayDang)));
   return l; }
-function veSP(){
-  const bar=document.getElementById("spBar"), box=document.getElementById("spList"); if(!bar) return; const t=homNay(), l=locSP(), f=S.shop;
-  const sizes=[...new Set(dsBan().map(m=>m.size).filter(Boolean))].sort();
-  const c=(k,v,tx)=>`<button class="chip" data-a="sf" data-k="${k}" data-v="${esc(v)}" aria-pressed="${f[k]===v}">${esc(tx)}</button>`;
-  bar.innerHTML=`<div class="chips">${c("hang","all","Mọi hạng")}${c("hang","A","Hạng A")}${c("hang","B","Hạng B")}${c("hang","C","Hạng C")}${sizes.length?c("size","all","Mọi size")+sizes.map(s=>c("size",s,"Size "+s)).join(""):""}</div>
-   <div class="row"><span class="small muted num">${l.length} món</span><select id="sSort" aria-label="Sắp xếp"><option value="moi">Mới lên kệ</option><option value="re">Tiết kiệm nhiều nhất</option><option value="tang">Giá thấp đến cao</option><option value="giam">Giá cao đến thấp</option></select></div>`;
-  const ss=document.getElementById("sSort"); ss.value=f.sort; ss.onchange=()=>{f.sort=ss.value;veSP()};
-  const trong=new Set(S.cart);
-  box.innerHTML=l.length?`<div class="grid">${l.map(m=>{ const g=giaNay(m,t),n=m.ngayDang?soNgay(m.ngayDang,t):0,h=heSo(n),ny=Number(m.giaNiemYet)||0;
-    return `<article class="pcard"><div class="media"><button class="imgbtn" data-a="xem" data-id="${m.id}" aria-label="Xem ${esc(m.ten)}">${phHtml(m)}
-      <span class="badges"><span class="pill ${m.hang}">${m.hang}</span>${m.nguon!=="cherie"?`<span class="pill">Ký gửi</span>`:""}</span>${h<1?`<span class="off pill sale">−${Math.round((1-h)*100)}%</span>`:""}</button>
-      <button class="quick" data-a="them" data-id="${m.id}" ${trong.has(m.id)?"disabled":""}>${trong.has(m.id)?"Đã trong giỏ":"+ Thêm vào giỏ"}</button></div>
-      <div class="meta"><span>${esc(m.brand||"")}</span>${m.size?`<span>· Size ${esc(m.size)}</span>`:""}${m.mau?`<span>· ${esc(m.mau)}</span>`:""}</div>
-      <div class="nm" data-a="xem" data-id="${m.id}">${esc(m.ten)}</div>
-      <div class="price"><b class="num">${vnd(g)}</b>${ny>g?`<s class="num">${vnd(ny)}</s>`:""}</div>
-      ${ny>g?`<div class="save num">Rẻ hơn giá hãng ${Math.round((1-g/ny)*100)}%</div>`:""}</article>`; }).join("")}</div>`
-    :`<div class="empty" style="margin-block:12px 30px"><b>${S.ready?(dsBan().length?"Không có món khớp bộ lọc":"Kệ đang được làm mới"):"Đang tải sản phẩm…"}</b>${S.ready?(dsBan().length?"Thử bỏ bớt bộ lọc hoặc từ khoá.":"Món mới lên kệ mỗi tuần. Nhắn Zalo "+ZALO+" để được báo trước."):""}</div>`;
-}
-function xemSP(id){ const m=S.mon.find(x=>x.id===id); if(!m) return; const t=homNay(),g=giaNay(m,t),ny=Number(m.giaNiemYet)||0,a=m.anh||[];
-  const c=m.tinhTrang||{}, loi=LOI.filter(([k])=>c[k]).map(x=>x[1]), tot=TOT.filter(([k])=>c[k]).map(x=>x[1]);
-  openSheet(`<div class="row"><div><div class="eyebrow">${esc(m.brand||"")}</div><h2>${esc(m.ten)}</h2></div><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
-   ${a.length?`<div class="gal">${a.map(i=>`<div class="ph"><img src="${anh(i)}" alt="${esc(m.ten)}" loading="lazy"></div>`).join("")}</div>`:`<div style="max-width:260px">${phHtml(m)}</div>`}
-   <div class="price" style="font-size:20px"><b class="num" style="font-size:24px">${vnd(g)}</b>${ny>g?`<s class="num">Giá hãng ${vnd(ny)}</s><span class="save">Rẻ hơn ${Math.round((1-g/ny)*100)}%</span>`:""}</div>
-   <div class="row"><span class="pill ${m.hang}">${HANG[m.hang].ten} · ${HANG[m.hang].mo}</span>${m.size?`<span class="pill">Size ${esc(m.size)}</span>`:""}${m.mau?`<span class="pill">${esc(m.mau)}</span>`:""}${m.chatLieu?`<span class="pill">${esc(m.chatLieu)}</span>`:""}</div>
-   ${m.moTa?`<p style="margin:0;max-width:62ch">${esc(m.moTa)}</p>`:""}
-   <div class="card stack" style="gap:6px"><b>Tình trạng</b>
-     ${tot.map(x=>`<div class="small">✓ ${esc(x)}</div>`).join("")}${loi.map(x=>`<div class="small" style="color:var(--wine)">• ${esc(x)}</div>`).join("")}
-     ${m.loi?`<div class="small" style="color:var(--wine)">• ${esc(m.loi)}</div>`:""}${!tot.length&&!loi.length&&!m.loi?`<div class="small muted">Đã kiểm tại xưởng Care, không có lỗi cần ghi.</div>`:""}</div>
-   <div class="row"><button class="btn wine" data-a="muangay" data-id="${m.id}">Mua ngay</button><button class="btn line" data-a="them" data-id="${m.id}">${S.cart.includes(m.id)?"Đã trong giỏ":"Thêm vào giỏ"}</button></div>
-   <p class="small muted" style="margin:0">Mỗi món chỉ có một chiếc. Đặt xong tiệm giữ 24 giờ và nhắn Zalo gửi mã VietQR.</p>`); }
+function veMua(){ const el=document.getElementById("smain"), f=S.shop, t=homNay();
+  if(el.dataset.p!=="mua"){ el.dataset.p="mua"; el.innerHTML=`<div class="max gut"><div class="mhead" id="mHead"></div><div class="filters" id="mBar"></div><div id="mTags" class="mtags"></div><div id="mList"></div></div>`; }
+  const l=locSP(), all=dsBan(), sizes=[...new Set(all.map(m=>m.size).filter(Boolean))].sort();
+  const tieuDe=f.q?`Kết quả cho “${esc(f.q)}”`:[f.dm!=="all"?tenDM(f.dm):"",f.pk!=="all"?PK[f.pk].ten:"",f.giam?"Đang giảm giá":""].filter(Boolean).join(" · ")||"Tất cả món";
+  document.getElementById("mHead").innerHTML=`<nav class="crumb"><a href="#">Trang chủ</a> / <span>Mua</span></nav><h1>${tieuDe}</h1><p class="muted num">${l.length} món${S.ready?"":" · đang tải…"}</p>`;
+  const sel=(k,opts,lab)=>`<label class="chipsel ${f[k]!==LOC0[k]?"on":""}"><span class="sr">${lab}</span><select data-loc="${k}" aria-label="${lab}">${opts.map(([v,tx])=>`<option value="${esc(v)}" ${String(f[k])===String(v)?"selected":""}>${esc(tx)}</option>`).join("")}</select></label>`;
+  document.getElementById("mBar").innerHTML=sel("dm",[["all","Danh mục"]].concat(DM),"Danh mục")+sel("pk",[["all","Phân khúc"]].concat(Object.entries(PK).map(([k,p])=>[k,p.ten])),"Phân khúc")
+    +sel("gia",Object.entries(GIA_KHOANG).map(([k,x])=>[k,k==="all"?"Giá":x[0]]),"Giá")+sel("hang",[["all","Tình trạng"],["A","Hạng A · như mới"],["B","Hạng B · còn đẹp"],["C","Hạng C · lỗi nhỏ"]],"Tình trạng")
+    +(sizes.length?sel("size",[["all","Size"]].concat(sizes.map(s=>[s,"Size "+s])),"Size"):"")+sel("nguon",[["all","Nguồn hàng"],["cherie","Của CHÉRIE"],["kygui","Ký gửi"]],"Nguồn hàng")
+    +`<button class="chip" data-a="locGiam" aria-pressed="${!!f.giam}">Đang giảm giá</button><span class="grow"></span>`+sel("sort",[["moi","Mới lên kệ"],["re","Tiết kiệm nhiều nhất"],["tang","Giá thấp đến cao"],["giam","Giá cao đến thấp"]],"Sắp xếp");
+  document.getElementById("mBar").querySelectorAll("select[data-loc]").forEach(s=>s.onchange=()=>{ f[s.dataset.loc]=s.value; veMua(); });
+  const tags=Object.keys(LOC0).filter(k=>k!=="sort"&&f[k]!==LOC0[k]);
+  document.getElementById("mTags").innerHTML=tags.length?tags.map(k=>`<button class="chip on" data-a="boLoc" data-k="${k}">${esc(k==="q"?"“"+f.q+"”":k==="dm"?tenDM(f.dm):k==="pk"?PK[f.pk].ten:k==="gia"?GIA_KHOANG[f.gia][0]:k==="hang"?"Hạng "+f.hang:k==="size"?"Size "+f.size:k==="nguon"?(f.nguon==="cherie"?"Của CHÉRIE":"Ký gửi"):"Đang giảm giá")} ×</button>`).join("")+`<button class="linkbtn" data-a="loc" data-k="reset">Xoá bộ lọc</button>`:"";
+  document.getElementById("mList").innerHTML=luoi(l,t,all.length?`<div class="empty"><b>Không có món khớp</b>Thử bỏ bớt bộ lọc, hoặc <a href="#ban">bán món bạn đang tìm cho người khác</a>.</div>`:trongKe()); }
+
+/* ---------- Trang sản phẩm ---------- */
+function veSanPham(id){ const el=document.getElementById("smain"), t=homNay(), m=S.mon.find(x=>x.id===id);
+  if(!m){ el.dataset.p=""; el.innerHTML=`<div class="max gut sect">${S.ready?`<div class="empty"><b>Món này đã bán hoặc không còn trên kệ</b><a href="#mua" data-a="loc" data-k="reset">Xem món khác →</a></div>`:`<div class="empty"><b>Đang tải…</b></div>`}</div>`; return; }
+  const g=giaNay(m,t), key=["sp",id,m.tt,g,THICH.has(id),S.cart.includes(id)].join("|"); if(el.dataset.p===key) return; el.dataset.p=key;
+  const a=m.anh||[], ny=Number(m.giaNiemYet)||0, off=ny>g?Math.round((1-g/ny)*100):0, pk=phanKhuc(m), dm=danhMuc(m), c=m.tinhTrang||{};
+  const tot=TOT.filter(([k])=>c[k]).map(x=>x[1]), loi=LOI.filter(([k])=>c[k]).map(x=>x[1]); const nx=lanGiamToi(m,t);
+  const lq=dsBan().filter(x=>x.id!==id).map(x=>[x,(danhMuc(x)===dm?2:0)+(phanKhuc(x)===pk?1:0)]).filter(x=>x[1]).sort((p,q)=>q[1]-p[1]).slice(0,4).map(x=>x[0]);
+  S.spAnh=0;
+  el.innerHTML=`<div class="max gut sp"><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#mua" data-a="loc" data-k="dm" data-v="${dm}">${tenDM(dm)}</a> / <span>${esc(m.ten)}</span></nav>
+   <div class="spgrid"><div class="gallery">${a.length>1?`<div class="thumbs-v">${a.map((x,i)=>`<button data-a="anhSP" data-v="${i}" aria-label="Ảnh ${i+1}" aria-pressed="${i===0}"><img src="${anh(x,200)}" alt=""></button>`).join("")}</div>`:""}
+     <div class="mainimg"><div id="spMain">${a.length?`<img src="${anh(a[0],1200)}" alt="${esc(m.ten)}">`:phHtml(m)}</div>
+       ${a.length>1?`<button class="nav l" data-a="anhSP" data-v="-1" aria-label="Ảnh trước">${ico("left")}</button><button class="nav r" data-a="anhSP" data-v="+1" aria-label="Ảnh sau">${ico("right")}</button>`:""}
+       <button class="heart big" data-a="thich" data-id="${esc(id)}" aria-pressed="${THICH.has(id)}" aria-label="Yêu thích">${ico("heart")}</button></div></div>
+    <aside class="buybox">${pk==="luxury"?`<span class="tag lux static">Luxury · đã kiểm định</span>`:""}
+     <h1 class="sptitle">${esc(m.ten)}</h1><div class="seller">${esc(m.brand||"")} · ${laKG(m)?"Ký gửi qua CHÉRIE":"Hàng của CHÉRIE"}</div>
+     <div class="bigprice num">${vnd(g)}</div>${off?`<div class="small"><s class="muted num">Giá hãng ${vnd(ny)}</s> · <b class="save num">Tiết kiệm ${vnd(ny-g)} (${off}%)</b></div>`:""}
+     ${nx&&m.tt==="dang"?`<div class="small muted">Giá tự giảm theo thời gian trên kệ. Mỗi món chỉ có một chiếc.</div>`:""}
+     ${m.tt==="dang"?`<div class="stack" style="gap:8px"><button class="btn block" data-a="them" data-id="${esc(id)}" ${S.cart.includes(id)?"disabled":""}>${S.cart.includes(id)?"Đã trong giỏ":"Thêm vào giỏ"}</button><button class="btn block line" data-a="muangay" data-id="${esc(id)}">Mua ngay, tiệm giữ 24 giờ</button></div>`
+       :`<div class="banner">${m.tt==="giu"?"Món này đang có khách giữ. Nhắn Zalo "+ZALO+" để xếp hàng chờ.":"Món này đã bán."}</div>`}
+     <div class="policy"><div><span>Đổi trả</span><b>Trong 3 ngày</b></div><div><span>Giao hàng</span><b>Toàn quốc · Đà Nẵng thứ 2, thứ 6</b></div><div><span>Thanh toán</span><b>VietQR, có biên nhận</b></div><div><span>Kiểm định</span><b>Nguồn gốc và tình trạng tại xưởng Care</b></div></div>
+     <div class="hl"><h3>Thông tin món</h3><ul>
+       <li><span>Tình trạng</span><b>${HANG[m.hang].ten} · ${HANG[m.hang].mo}</b></li>${m.size?`<li><span>Size</span><b>${esc(m.size)}</b></li>`:""}${m.mau?`<li><span>Màu</span><b>${esc(m.mau)}</b></li>`:""}${m.chatLieu?`<li><span>Chất liệu</span><b>${esc(m.chatLieu)}</b></li>`:""}
+       <li><span>Danh mục</span><b>${tenDM(dm)} · ${PK[pk].ten}</b></li>${m.ma?`<li><span>Mã món</span><b class="num">${esc(m.ma)}</b></li>`:""}</ul></div>
+     <div class="hl"><h3>Kiểm tra tình trạng</h3>${tot.map(x=>`<div class="small">✓ ${esc(x)}</div>`).join("")}${loi.map(x=>`<div class="small lo">• ${esc(x)}</div>`).join("")}${m.loi?`<div class="small lo">• ${esc(m.loi)}</div>`:""}${!tot.length&&!loi.length&&!m.loi?`<div class="small muted">Đã kiểm tại xưởng Care, không có lỗi cần ghi.</div>`:""}</div>
+     ${m.moTa?`<div class="hl"><h3>Mô tả</h3><p>${esc(m.moTa)}</p></div>`:""}</aside></div>
+   ${lq.length?`<section class="sect"><div class="sh"><h2>Có thể bạn cũng thích</h2></div>${luoi(lq,t,"")}</section>`:""}
+   <section class="sect"><div class="sellband slim"><div><b>Có món ${esc(tenDM(dm).toLowerCase())} trong tủ muốn bán?</b> Xem ngay bạn nhận được bao nhiêu.</div><a class="btn" href="#ban" data-a="goSell" data-v="" data-dm="${dm}">Nhận báo giá</a></div></section></div>`; }
+function doiAnhSP(v){ const m=S.mon.find(x=>"sp-"+x.id===trangShop()); if(!m) return; const a=m.anh||[]; if(!a.length) return;
+  S.spAnh=v==="-1"?(S.spAnh-1+a.length)%a.length:v==="+1"?(S.spAnh+1)%a.length:Number(v);
+  document.getElementById("spMain").innerHTML=`<img src="${anh(a[S.spAnh],1200)}" alt="${esc(m.ten)}">`;
+  document.querySelectorAll(".thumbs-v button").forEach((b,i)=>b.setAttribute("aria-pressed",i===S.spAnh)); }
+
+/* ---------- Bán & ký gửi ---------- */
+const CACH=[
+ {k:"ban",ic:"cash",ten:"Ký gửi bán",ngan:"Nhận nhiều tiền nhất khi món bán được",nhan:"Nhận nhiều nhất"},
+ {k:"bandut",ic:"clock",ten:"Bán đứt cho tiệm",ngan:"Nhận tiền trong 24 giờ sau khi tiệm kiểm đồ",nhan:"Nhận tiền nhanh nhất"},
+ {k:"tindung",ic:"swap",ten:"Đổi tín dụng CHÉRIE",ngan:`Cao hơn bán đứt ${Math.round((TIN_DUNG-1)*100)}%, dùng thuê đầm, Office, Care, Seconde`,nhan:"Lợi nhất nếu bạn hay thuê đồ"},
+ {k:"thue",ic:"rent",ten:"Ký gửi cho thuê",ngan:"Đầm vào kho cho thuê, bạn hưởng 50% mỗi lượt",nhan:"Thu nhập lặp lại"}];
+function veBan(){ const el=document.getElementById("smain"); if(el.dataset.p==="ban") return; el.dataset.p="ban"; const B=S.ban=Object.assign({dm:"tui",brand:"",giaMua:0,hang:"A",cach:"ban"},S.ban||{});
+  el.innerHTML=`<section class="band slim"><div class="max gut"><div class="eyebrow">Bán & ký gửi</div><h1>Bán đồ hiệu của bạn. Biết trước nhận bao nhiêu.</h1>
+    <p>Nhập món, xem 4 cách bán và số tiền ước tính ngay. Tiệm gửi offer chính thức qua Zalo trong 24 giờ làm việc sau khi xem ảnh.</p></div></section>
+  <div class="max gut sellgrid">
+   <form id="fBan" class="stack" style="gap:22px" novalidate>
+    <section class="card stack"><div class="stp"><span>1</span><h2>Món bạn muốn bán</h2></div>
+     <div class="g2"><label class="f">Danh mục<select id="bDM">${DM.map(([k,tx])=>`<option value="${k}" ${B.dm===k?"selected":""}>${tx}</option>`).join("")}</select></label>
+      <label class="f">Thương hiệu<input id="bBrand" list="dsBrandKH2" value="${esc(B.brand)}" placeholder="Chanel, Coach, SIXDO…" required></label>
+      <label class="f">Giá mua lúc đầu<input id="bGiaMua" inputmode="numeric" value="${B.giaMua?vnd(B.giaMua).replace("đ",""):""}" placeholder="5.000.000" required></label>
+      <label class="f">Tên món, mẫu, size<input id="bLoai" placeholder="Túi Tabby 26, đầm lụa size S…"></label></div>
+     <datalist id="dsBrandKH2">${LUX.concat(CAOCAP).filter(x=>x.length>3).map(x=>`<option value="${esc(x.replace(/\b\w/g,c=>c.toUpperCase()))}">`).join("")}</datalist>
+     <div class="f">Tình trạng<div class="choose3">${Object.entries(HANG).map(([k,h])=>`<button type="button" data-a="bHang" data-v="${k}" aria-pressed="${B.hang===k}"><b>${h.ten}</b><span>${h.mo}</span></button>`).join("")}</div></div></section>
+    <section class="card stack"><div class="stp"><span>2</span><h2>Chọn cách bán</h2></div><div id="bOffers" class="offers"></div><p class="small muted" id="bNote" style="margin:0"></p></section>
+    <section class="card stack"><div class="stp"><span>3</span><h2>Gửi để nhận offer chính thức</h2></div>
+     <div class="g2"><label class="f">Tên của bạn<input id="bTen" autocomplete="name" required></label><label class="f">Số Zalo<input id="bSdt" inputmode="tel" autocomplete="tel" required></label>
+      <label class="f">Bằng chứng mua<select id="bBC"><option>Hóa đơn</option><option>Còn tag</option><option>Ảnh đơn hàng online</option><option>Chưa có</option></select></label>
+      <label class="f" id="bSanW">Giá thấp nhất bạn đồng ý bán (giá sàn)<input id="bSan" inputmode="numeric" placeholder="Không bắt buộc"></label></div>
+     <label class="f">Ghi chú thêm (năm mua, số lần dùng, phụ kiện kèm theo)<textarea id="bMoTa"></textarea></label>
+     <input id="bWeb2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0">
+     <div class="row"><button class="btn wine" type="submit" id="bGui">Gửi và nhận offer</button><span class="small muted">Sau khi gửi, bạn gửi 3–5 ảnh qua Zalo ${ZALO}.</span></div></section>
+   </form>
+   <aside class="stack sellside">
+    <div class="card stack"><h3>Phí ký gửi</h3><div class="tiers num"><div><span>Món dưới 500.000đ</span><b>30%</b></div><div><span>500.000đ – 10.000.000đ</span><b>25%</b></div><div><span>Trên 10.000.000đ</span><b>20%</b></div><div><span>Luxury giá trị cao</span><b>Thỏa thuận</b></div></div></div>
+    <div class="card stack"><h3>Lịch giá khi ký gửi</h3><div class="tiers"><div><span>Giữ đồ tối đa</span><b>${HAN_NGAY} ngày</b></div><div><span>Từ ngày 30</span><b>Giảm 20%</b></div><div><span>Từ ngày 45</span><b>Giảm 35%</b></div><div><span>Không thấp hơn</span><b>Giá sàn của bạn</b></div></div></div>
+    <div class="card stack"><h3>Tiệm nhận gì</h3><p class="small" style="margin:0">Đầm, đồ công sở, túi, giày, phụ kiện còn tốt, có hóa đơn, tag hoặc bằng chứng mua. Hàng không rõ nguồn gốc hoặc hàng giả bị từ chối và trả lại.</p>
+     <p class="small" style="margin:0">Mỗi món được giặt hấp và kiểm tại xưởng CHÉRIE Care trước khi lên kệ.</p></div>
+    <a class="card linkcard" href="#tra-cuu"><b>Đã gửi đồ rồi?</b><span class="small muted">Tra cứu tình trạng và tiền ký gửi →</span></a></aside></div>`;
+  const nhap=()=>{ B.dm=val("bDM"); B.brand=val("bBrand").trim(); B.giaMua=tien(val("bGiaMua")); B.loai=val("bLoai").trim(); veOffer(); };
+  ["bDM","bBrand","bGiaMua","bLoai"].forEach(i=>document.getElementById(i).addEventListener("input",nhap));
+  document.getElementById("bGiaMua").addEventListener("blur",e=>{ const g=tien(e.target.value); e.target.value=g?vnd(g).replace("đ",""):""; });
+  document.getElementById("fBan").addEventListener("submit",guiBan); veOffer(); }
+function tinhOffer(B){ const u=uocTinh({brand:B.brand,giaMua:B.giaMua,hang:B.hang}), r=tyLeHH(u.giua);
+  const md=tron(u.giua*MUA_DUT[u.pk]), cho=["dam","congso"].includes(B.dm);
+  return {u,r,ban:[tron(u.thap*(1-tyLeHH(u.thap))),tron(u.cao*(1-tyLeHH(u.cao)))],bandut:md,tindung:tron(md*TIN_DUNG),thue:cho?[tron(GIA_THUE[0]*CHIA_THUE),tron(GIA_THUE[1]*CHIA_THUE)]:null}; }
+function veOffer(){ const B=S.ban, box=document.getElementById("bOffers"); if(!box) return;
+  if(!B.giaMua){ box.innerHTML=`<div class="empty slim">Nhập thương hiệu và giá mua lúc đầu để xem bạn nhận được bao nhiêu.</div>`; document.getElementById("bNote").textContent=""; return; }
+  const o=tinhOffer(B); if(B.cach==="thue"&&!o.thue) B.cach="ban";
+  const tienCach={ban:`${vnd(o.ban[0])} – ${vnd(o.ban[1])}`,bandut:vnd(o.bandut),tindung:vnd(o.tindung),thue:o.thue?`${vnd(o.thue[0])} – ${vnd(o.thue[1])} / lượt`:"Chỉ nhận đầm, đồ công sở"};
+  const khi={ban:"khi món bán được",bandut:"tiền mặt, 24 giờ sau khi kiểm",tindung:"tín dụng dùng trong hệ CHÉRIE",thue:"mỗi lượt thuê, trả trong 7 ngày"};
+  box.innerHTML=CACH.map(c=>`<button type="button" class="offer" data-a="bCach" data-v="${c.k}" aria-pressed="${B.cach===c.k}" ${c.k==="thue"&&!o.thue?"disabled":""}>
+     <span class="ohead">${ico(c.ic,"wico")}<span class="badge">${c.nhan}</span></span><b>${c.ten}</b><span class="amt num">${tienCach[c.k]}</span><span class="small muted">${khi[c.k]}</span><span class="small">${c.ngan}</span></button>`).join("");
+  const thap=o.u.giua<GIA_TOI_THIEU&&B.cach==="ban";
+  document.getElementById("bNote").innerHTML=`${PK[o.u.pk].ten}: giá bán lại dự kiến ${vnd(o.u.thap)} – ${vnd(o.u.cao)}${B.cach==="ban"?`, phí ký gửi ${Math.round(o.r*100)}%`:""}. Đây là ước tính, offer chính thức báo qua Zalo sau khi xem ảnh.${thap?` <b>Món dưới ${vnd(GIA_TOI_THIEU)} chưa nhận ký gửi bán, bạn có thể chọn bán đứt hoặc đổi tín dụng.</b>`:""}`;
+  const sw=document.getElementById("bSanW"); if(sw) sw.hidden=B.cach!=="ban"; }
+async function guiBan(ev){ ev.preventDefault(); const B=S.ban, so=sdt(val("bSdt")), ten=val("bTen").trim();
+  if(!B.brand||!B.giaMua){ toast("Nhập thương hiệu và giá mua ở bước 1."); document.getElementById("bBrand").focus(); return; }
+  if(!ten||so.length<9){ toast("Nhập tên và số Zalo."); return; }
+  const o=tinhOffer(B); if(B.cach==="ban"&&o.u.giua<GIA_TOI_THIEU){ toast("Món dưới "+vnd(GIA_TOI_THIEU)+" chưa nhận ký gửi bán. Chọn bán đứt hoặc đổi tín dụng."); return; }
+  const btn=document.getElementById("bGui"); btn.disabled=true;
+  try{ const kq=await S.db.collection("dangky").add({ten,sdt:so,brand:B.brand,loai:B.loai||tenDM(B.dm),danhMuc:B.dm,phanKhuc:o.u.pk,hangKhach:B.hang,giaMua:B.giaMua,giaMuon:0,giaSan:B.cach==="ban"?tien(val("bSan")):0,uocTinh:o.u.giua,
+      hinh:B.cach,bangChung:val("bBC"),moTa:val("bMoTa").trim(),web2:val("bWeb2"),ngay:homNay(),gio:gioNay(),tt:"moi"});
+    const ma=kq&&kq.id, ca=CACH.find(c=>c.k===B.cach);
+    openSheet(`<div class="row"><h2>Đã nhận yêu cầu</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
+     <div class="banner ok">Mã của bạn: <b class="num" style="user-select:all">${esc(ma||"")}</b> · ${esc(ca.ten)}. Giữ mã này để tra cứu.</div>
+     <ol class="small" style="margin:0;padding-left:18px"><li>Gửi 3–5 ảnh rõ (toàn món, logo/tag, chỗ hao mòn, hóa đơn) qua Zalo ${ZALO}, ghi mã ${esc(ma||"")}.</li><li>Tiệm báo offer chính thức trong 24 giờ làm việc.</li><li>Bạn đồng ý thì hẹn giao đồ: tận nơi ở Đà Nẵng thứ 2, thứ 6 hoặc gửi xe toàn quốc.</li></ol>
+     <div class="row"><a class="btn wine" href="https://zalo.me/${ZALO}" target="_blank" rel="noopener">Mở Zalo gửi ảnh</a><button class="btn line" data-a="dong">Xong</button></div>`);
+    ["bTen","bSdt","bSan","bMoTa"].forEach(i=>document.getElementById(i).value="");
+  }catch(e){ loiGhi(e); } btn.disabled=false; }
+
+/* ---------- Tra cứu đồ ký gửi ---------- */
+function veTraCuu(){ const el=document.getElementById("smain"); if(el.dataset.p==="tra-cuu"){ traCuu(); return; } el.dataset.p="tra-cuu";
+  el.innerHTML=`<div class="max gut sect" style="max-width:860px"><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#ban">Bán & ký gửi</a> / <span>Tra cứu</span></nav>
+   <h1>Tra cứu đồ ký gửi</h1><p class="muted">Xem món đang bán, số tiền sắp nhận và lịch tự giảm giá.</p>
+   <div class="card stack"><div class="row"><input id="traSdt" inputmode="tel" placeholder="Số Zalo đã đăng ký" style="flex:1 1 180px"><input id="traMa" placeholder="Mã DK-… hoặc mã món" style="flex:1 1 180px;text-transform:uppercase"><button class="btn" data-a="tra">Xem</button></div>
+   <p class="small muted" style="margin:0">Mã DK-… nhận khi gửi yêu cầu bán, hoặc mã món trên biên nhận ký gửi.</p><div id="traKq"></div></div></div>`; traCuu(); }
+function traCuu(){ const k=document.getElementById("traKq"); if(!k||!S.traSo) return; const t=homNay();
+  const T=S.tra||{}, mon=T.mon||[], dk=T.dangky||[], don=T.don||[], th=T.thue||[];
+  if(!mon.length&&!dk.length){ k.innerHTML=`<div class="empty"><b>Chưa thấy đồ với số này</b>Kiểm tra lại số và mã.</div>`; return; }
+  const cho=don.filter(d=>!d.daTra).reduce((s,d)=>s+d.tienChuDo,0)+th.filter(x=>!x.daTra).reduce((s,x)=>s+x.chiaChuDo,0), da=don.filter(d=>d.daTra).reduce((s,d)=>s+d.tienChuDo,0)+th.filter(x=>x.daTra).reduce((s,x)=>s+x.chiaChuDo,0);
+  k.innerHTML=`<div class="kpis"><div class="kpi"><span class="k">Tiền sắp nhận</span><span class="v num">${vnd(cho)}</span></div><div class="kpi"><span class="k">Đã nhận</span><span class="v num">${vnd(da)}</span></div><div class="kpi"><span class="k">Đang bán</span><span class="v num">${mon.filter(m=>m.tt==="dang").length}</span></div><div class="kpi"><span class="k">Đã bán</span><span class="v num">${mon.filter(m=>m.tt==="ban").length}</span></div></div>
+  <div class="stack" style="margin-top:12px;gap:8px">${dk.map(x=>`<div class="irow nosel" style="cursor:default"><div class="ph"><div class="mono">${esc((x.brand||"").slice(0,6).toUpperCase())}</div></div><div><div class="ttl">${esc(x.brand)} ${esc(x.loai)}</div><div class="sub"><span class="pill warn">${x.offer?"Đã có offer":"Chờ tiệm báo giá"}</span>${esc(CACH.find(c=>c.k===x.hinh)?.ten||"")} · ${ngVN(x.ngay)}</div></div><div class="pr num">${x.offer?vnd(x.offer):x.uocTinh?"~"+vnd(x.uocTinh):""}</div></div>`).join("")}
+  ${mon.map(m=>{ const d=don.find(x=>x.monId===m.id); let note=""; if(m.tt==="dang"&&m.ngayDang){ const n=soNgay(m.ngayDang,t); note=`Đã treo ${n} ngày`; const nx=lanGiamToi(m,t); if(nx) note+=` · ${ngNgan(nx.ngay)} giảm còn ${vnd(Math.max(tron(m.giaDang*nx.he),Number(m.giaSan)||0))}`; }
+    if(d) note=d.daTra?`Đã chuyển ${vnd(d.tienChuDo)} ngày ${ngVN(d.ngayTraTien)}`:`Bạn nhận ${vnd(d.tienChuDo)} trước ${ngVN(d.hanTra)}`; if(m.tt==="thue") note=`${th.filter(x=>x.monId===m.id).length} lượt thuê`;
+    return `<div class="irow nosel" style="cursor:default">${phHtml(m)}<div><div class="ttl">${esc(m.ten)}</div><div class="sub">${pillTT(m)}<span>${note}</span></div></div><div class="pr num">${vnd(m.tt==="ban"&&d?d.gia:giaNay(m,t))}</div></div>`; }).join("")}</div>`; }
+
+/* ---------- Yêu thích ---------- */
+function veThich(){ const el=document.getElementById("smain"), t=homNay(); el.dataset.p="yeu-thich";
+  const l=[...THICH].map(id=>S.mon.find(m=>m.id===id)).filter(m=>m&&m.tt==="dang"), mat=[...THICH].length-l.length;
+  el.innerHTML=`<div class="max gut sect"><h1>Yêu thích</h1><p class="muted">Lưu trên máy này. Mỗi món chỉ có một chiếc, đặt sớm để giữ.</p>
+   ${luoi(l,t,`<div class="empty"><b>${S.ready?"Chưa có món yêu thích":"Đang tải…"}</b>Bấm hình trái tim trên món bạn thích để lưu lại. <a href="#mua" data-a="loc" data-k="reset">Xem kệ hàng →</a></div>`)}
+   ${mat>0&&S.ready?`<p class="small muted">${mat} món bạn từng thích đã có người mua.</p>`:""}</div>`; }
+
+/* ---------- Giỏ hàng ---------- */
 function moGio(){ openSheet(`<div id="cartPanel" class="stack"></div>`,true); veGio(); }
 function veGio(){ const p=document.getElementById("cartPanel"); if(!p) return; const t=homNay(); const ids=gioHop(), ms=ids.map(id=>S.mon.find(m=>m.id===id));
   const tong=ms.reduce((s,m)=>s+giaNay(m,t),0), goc=ms.reduce((s,m)=>s+(Number(m.giaNiemYet)||0),0);
   const keep={ten:val("oTen"),sdt:val("oSdt"),noi:val("oNoi"),ghi:val("oGhi")};
   p.innerHTML=`<div class="row"><h2>Giỏ hàng</h2><span class="muted num">${ms.length} món</span><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
-   ${ms.length?ms.map(m=>`<div class="cline">${phHtml(m)}<div><div style="font-weight:600">${esc(m.ten)}</div><div class="small muted">${esc(m.brand||"")} · ${HANG[m.hang].ten}${m.size?" · Size "+esc(m.size):""}</div><button class="btn sm line" style="margin-top:6px" data-a="bo" data-id="${m.id}">Bỏ</button></div><b class="num">${vnd(giaNay(m,t))}</b></div>`).join("")
-     +`<div class="breakdown num"><div><span>Giá hãng</span><s>${vnd(goc)}</s></div><div><span>Bạn tiết kiệm</span><span style="color:var(--wine)">${vnd(goc-tong)}</span></div><div><span>Tạm tính</span><span>${vnd(tong)}</span></div></div>
+   ${ms.length?ms.map(m=>`<div class="cline">${phHtml(m)}<div><a href="#sp-${esc(m.id)}" data-a="dong" style="font-weight:600;text-decoration:none">${esc(m.ten)}</a><div class="small muted">${esc(m.brand||"")} · ${HANG[m.hang].ten}${m.size?" · Size "+esc(m.size):""}</div><button class="btn sm line" style="margin-top:6px" data-a="bo" data-id="${esc(m.id)}">Bỏ</button></div><b class="num">${vnd(giaNay(m,t))}</b></div>`).join("")
+     +`<div class="breakdown num">${goc>tong?`<div><span>Giá hãng</span><s>${vnd(goc)}</s></div><div><span>Bạn tiết kiệm</span><span class="save">${vnd(goc-tong)}</span></div>`:""}<div><span>Tạm tính</span><span>${vnd(tong)}</span></div></div>
      <form id="fOrder" class="stack"><b>Thông tin nhận hàng</b>
       <label class="f">Họ tên<input id="oTen" required autocomplete="name" value="${esc(keep.ten)}"></label>
       <label class="f">Số Zalo<input id="oSdt" required inputmode="tel" autocomplete="tel" value="${esc(keep.sdt)}"></label>
       <label class="f">Địa chỉ nhận<input id="oNoi" autocomplete="street-address" value="${esc(keep.noi)}"></label>
       <label class="f">Ghi chú (size bạn hay mặc, giờ nhận…)<input id="oGhi" value="${esc(keep.ghi)}"></label>
-      <button class="btn wine block" type="submit" ${S.canWrite===false?"disabled":""}>Đặt giữ ${ms.length} món · ${vnd(tong)}</button>
-      <p class="small muted" style="margin:0">Phí ship báo khi tiệm nhắn Zalo. ${S.canWrite===false?"Trang đang ở chế độ xem, nhắn Zalo "+ZALO+" để đặt.":""}</p></form>`
+      <button class="btn wine block" type="submit">Đặt giữ ${ms.length} món · ${vnd(tong)}</button>
+      <p class="small muted" style="margin:0">Tiệm giữ 24 giờ, nhắn Zalo gửi mã VietQR và báo phí ship.</p></form>`
    :`<div class="empty"><b>Giỏ đang trống</b>Chọn món bạn thích rồi bấm "Thêm vào giỏ".</div>`}`;
   const f=document.getElementById("fOrder"); if(f) f.addEventListener("submit",async ev=>{ ev.preventDefault();
     const ten=val("oTen").trim(), so=sdt(val("oSdt")); if(!ten||so.length<9){ toast("Nhập họ tên và số Zalo."); return; }
     const con=gioHop().map(id=>S.mon.find(m=>m.id===id)).filter(m=>m&&m.tt==="dang"); if(!con.length){ toast("Món trong giỏ vừa có người mua."); veGio(); return; }
+    f.querySelector("button[type=submit]").disabled=true;
     try{ const items=con.map(m=>({monId:m.id,ma:m.ma||"",ten:m.ten,gia:giaNay(m,homNay())}));
       await S.db.collection("dathang").add({items,ten,sdt:so,noi:val("oNoi").trim(),ghiChu:val("oGhi").trim(),tong:items.reduce((s,i)=>s+i.gia,0),ngay:homNay(),gio:gioNay(),tt:"moi"});
       for(const m of con) await S.db.doc("mon/"+m.id).update({tt:"giu",lichSu:lichSu(m,"Khách "+ten+" đặt giữ")});
-      S.cart=[]; luuGio(); document.getElementById("cartPanel").outerHTML=`<div class="stack"><div class="row"><h2>Đã nhận đơn</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div><div class="banner ok">Tiệm đang giữ ${items.length} món cho bạn trong 24 giờ và sẽ nhắn Zalo ${esc(so)} để gửi mã VietQR.</div><button class="btn" data-a="dong">Tiếp tục xem</button></div>`; veSP();
-    }catch(e){ loiGhi(e); } });
-  document.getElementById("cartN").textContent=ids.length; }
+      S.cart=[]; luuGio(); document.getElementById("cartPanel").outerHTML=`<div class="stack"><div class="row"><h2>Đã nhận đơn</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div><div class="banner ok">Tiệm đang giữ ${items.length} món cho bạn trong 24 giờ và sẽ nhắn Zalo ${esc(so)} để gửi mã VietQR.</div><button class="btn" data-a="dong">Tiếp tục xem</button></div>`;
+      document.getElementById("smain").dataset.p=""; veLai();
+    }catch(e){ loiGhi(e); f.querySelector("button[type=submit]").disabled=false; } }); }
+function renderShopDem(){ const n=gioHop().length, c=document.getElementById("cartN"); if(c){ c.textContent=n; c.hidden=!n; } const tn=[...THICH].filter(id=>S.mon.some(m=>m.id===id&&m.tt==="dang")).length, th=document.getElementById("thichN"); if(th){ th.textContent=tn; th.hidden=!tn; } }
+function moMenuDM(){ openSheet(`<div class="row"><h2>Danh mục</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
+  <div class="menudm">${DM.map(([k,tx])=>`<a href="#mua" data-a="loc" data-k="dm" data-v="${k}">${ico(k,"cico sm")}<span>${tx}</span></a>`).join("")}</div>
+  <b>Phân khúc</b><div class="menudm">${Object.entries(PK).map(([k,p])=>`<a href="#mua" data-a="loc" data-k="pk" data-v="${k}">${ico(k==="luxury"?"luxury":"giam","cico sm")}<span>${p.ten}<small>${p.mo}</small></span></a>`).join("")}</div>
+  <a class="btn wine" href="#ban" data-a="dong">Bán đồ của bạn</a>`,true); }
 
-/* ---------- Ký gửi (khách) ---------- */
-function renderKyGui(){ const el=document.getElementById("smain"); if(document.getElementById("fKg")){ traCuu(); return; }
-  el.innerHTML=`<div class="max gut stack" style="gap:26px;padding-block:24px">
-   <section class="hero" style="padding:0"><div><div class="eyebrow">Ký gửi tại CHÉRIE Seconde</div><h1>Tủ đồ đẹp nằm yên thì tiếc. Gửi CHÉRIE bán giúp bạn.</h1>
-     <p>Tiệm lo giặt hấp, chụp ảnh, đăng bán toàn quốc. Bạn chọn giá sàn, tiền về sau 3 ngày làm việc kể từ khi hết hạn đổi trả.</p></section>
-   <div class="steps"><div><b>Đăng ký</b>Điền form bên dưới hoặc nhắn Zalo.</div><div><b>Tiệm nhận và kiểm</b>Kiểm nguồn gốc, phân hạng, giặt hấp qua Care.</div><div><b>Đăng bán toàn quốc</b>Web, Zalo, Instagram, livestream.</div><div><b>Nhận tiền</b>Trong 3 ngày làm việc sau khi hết hạn đổi trả.</div></div>
-   <div class="g2">
-    <div class="card"><h3>Phí ký gửi</h3><div class="tiers num"><div><span>Món dưới 500.000đ</span><b>30%</b></div><div><span>500.000đ – 10.000.000đ</span><b>25%</b></div><div><span>Trên 10.000.000đ</span><b>20%</b></div><div><span>Hàng luxury</span><b>Thỏa thuận</b></div></div></div>
-    <div class="card"><h3>Thời hạn và giá</h3><div class="tiers"><div><span>Giữ đồ tối đa</span><b>${HAN_NGAY} ngày</b></div><div><span>Từ ngày 30</span><b>Giảm 20%</b></div><div><span>Từ ngày 45</span><b>Giảm 35%</b></div><div><span>Không bao giờ thấp hơn</span><b>Giá sàn của bạn</b></div></div></div>
-    <div class="card stack" style="gap:8px"><h3>Bạn nhận được bao nhiêu?</h3><label class="f">Giá bán dự kiến<input id="tinhGia" inputmode="numeric" placeholder="1.200.000"></label><div id="tinhKq" class="num"></div><p class="small muted" style="margin:0">Giá bán tối thiểu ${vnd(GIA_TOI_THIEU)}. Nhận hàng thương hiệu có hóa đơn, tag hoặc bằng chứng mua.</p></div>
-   </div>
-   <form id="fKg" class="card stack"><h2>Đăng ký gửi đồ</h2>
-    <div class="g2"><label class="f">Tên của bạn<input id="kgTen" required autocomplete="name"></label><label class="f">Số Zalo<input id="kgSdt" required inputmode="tel" autocomplete="tel"></label>
-     <label class="f">Thương hiệu<input id="kgBrand" required placeholder="SIXDO, Chanel, Coach…"></label><label class="f">Loại đồ<input id="kgLoai" placeholder="Đầm, túi, giày…"></label>
-     <label class="f">Giá mua lúc đầu<input id="kgGiaMua" inputmode="numeric"></label><label class="f">Giá muốn bán<input id="kgGiaMuon" inputmode="numeric"></label>
-     <label class="f">Giá sàn (thấp nhất bạn đồng ý)<input id="kgGiaSan" inputmode="numeric"></label>
-     <label class="f">Hình thức<select id="kgHinh"><option value="ban">Ký gửi bán</option><option value="thue">Ký gửi cho thuê (chia 50/50 tiền thuê)</option></select></label>
-     <label class="f">Bằng chứng mua<select id="kgBC"><option>Hóa đơn</option><option>Còn tag</option><option>Ảnh đơn hàng online</option><option>Chưa có</option></select></label></div>
-    <label class="f">Tình trạng, size, số lần đã mặc<textarea id="kgMoTa"></textarea></label>
-    <div class="row"><button class="btn wine" type="submit" ${S.canWrite===false?"disabled":""}>Gửi đăng ký</button><span class="small muted">Tiệm nhắn Zalo hẹn nhận đồ trong ngày làm việc.</span></div></form>
-   <div class="card stack"><h2>Tra cứu đồ ký gửi</h2><div class="row"><input id="traSdt" inputmode="tel" placeholder="Số Zalo đã đăng ký" style="flex:1 1 180px"><input id="traMa" placeholder="Mã đăng ký hoặc mã món" style="flex:1 1 180px;text-transform:uppercase"><button class="btn line" data-a="tra">Xem</button></div><p class="small muted" style="margin:0">Mã DK-… nhận khi gửi đăng ký, hoặc mã món trên biên nhận ký gửi.</p><div id="traKq"></div></div>
-  </div>${footer()}`;
-  const tinh=()=>{ const g=tien(val("tinhGia")),k=document.getElementById("tinhKq"); if(!g){k.innerHTML=`<span class="small muted">Nhập giá để xem phí và số tiền bạn nhận.</span>`;return}
-    const r=tyLeHH(g),h=Math.round(g*r); k.innerHTML=g<GIA_TOI_THIEU?`<span class="pill warn">Dưới mức tối thiểu ${vnd(GIA_TOI_THIEU)}</span>`:`<div class="breakdown"><div><span>Phí ${Math.round(r*100)}%</span><span>${vnd(h)}</span></div><div><span>Bạn nhận</span><span>${vnd(g-h)}</span></div></div>`; };
-  document.getElementById("tinhGia").addEventListener("input",tinh); tinh();
-  document.getElementById("fKg").addEventListener("submit",async ev=>{ ev.preventDefault(); const so=sdt(val("kgSdt")),san=tien(val("kgGiaSan")),muon=tien(val("kgGiaMuon"));
-    if(so.length<9){toast("Số Zalo chưa đúng.");return} if(muon&&muon<GIA_TOI_THIEU){toast("Giá muốn bán cần từ "+vnd(GIA_TOI_THIEU)+".");return} if(san&&muon&&san>muon){toast("Giá sàn cao hơn giá muốn bán.");return}
-    try{ const kq=await S.db.collection("dangky").add({ten:val("kgTen").trim(),sdt:so,brand:val("kgBrand").trim(),loai:val("kgLoai").trim(),giaMua:tien(val("kgGiaMua")),giaMuon:muon,giaSan:san,hinh:val("kgHinh"),bangChung:val("kgBC"),moTa:val("kgMoTa").trim(),ngay:homNay(),gio:gioNay(),tt:"moi"}); S.dkMoi=kq&&kq.id;
-      ["kgBrand","kgLoai","kgGiaMua","kgGiaMuon","kgGiaSan","kgMoTa"].forEach(i=>document.getElementById(i).value=""); openSheet(`<div class="row"><h2>Đã nhận đăng ký</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div><div class="banner ok">Mã đăng ký của bạn: <b class="num" style="user-select:all">${esc(S.dkMoi||"")}</b>. Giữ mã này để tra cứu đồ ký gửi.</div><p class="small muted" style="margin:0">Tiệm sẽ nhắn Zalo hẹn nhận đồ trong ngày làm việc.</p><button class="btn" data-a="dong">Xong</button>`); }catch(e){ loiGhi(e); } });
-}
-function traCuu(){ const k=document.getElementById("traKq"); if(!k||!S.traSo) return; const so=S.traSo, t=homNay();
-  const T=S.tra||{}, mon=T.mon||[], dk=T.dangky||[], don=T.don||[], th=T.thue||[];
-  if(!mon.length&&!dk.length){ k.innerHTML=`<div class="empty"><b>Chưa thấy đồ với số này</b>Kiểm tra lại số, hoặc gửi đăng ký ở trên.</div>`; return; }
-  const cho=don.filter(d=>!d.daTra).reduce((s,d)=>s+d.tienChuDo,0)+th.filter(x=>!x.daTra).reduce((s,x)=>s+x.chiaChuDo,0), da=don.filter(d=>d.daTra).reduce((s,d)=>s+d.tienChuDo,0)+th.filter(x=>x.daTra).reduce((s,x)=>s+x.chiaChuDo,0);
-  k.innerHTML=`<div class="kpis"><div class="kpi"><span class="k">Tiền sắp nhận</span><span class="v num">${vnd(cho)}</span></div><div class="kpi"><span class="k">Đã nhận</span><span class="v num">${vnd(da)}</span></div><div class="kpi"><span class="k">Đang bán</span><span class="v num">${mon.filter(m=>m.tt==="dang").length}</span></div><div class="kpi"><span class="k">Đã bán</span><span class="v num">${mon.filter(m=>m.tt==="ban").length}</span></div></div>
-  <div class="stack" style="margin-top:12px;gap:8px">${dk.map(x=>`<div class="irow nosel" style="cursor:default"><div class="ph"><div class="mono">${esc((x.brand||"").slice(0,6).toUpperCase())}</div></div><div><div class="ttl">${esc(x.brand)} ${esc(x.loai)}</div><div class="sub"><span class="pill warn">Chờ tiệm nhận</span>Đăng ký ${ngVN(x.ngay)}</div></div><div class="pr num">${x.giaMuon?vnd(x.giaMuon):""}</div></div>`).join("")}
-  ${mon.map(m=>{ const d=don.find(x=>x.monId===m.id); let note=""; if(m.tt==="dang"&&m.ngayDang){ const n=soNgay(m.ngayDang,t); note=`Đã treo ${n} ngày`; const nx=lanGiamToi(m,t); if(nx) note+=` · ${ngNgan(nx.ngay)} giảm còn ${vnd(Math.max(tron(m.giaDang*nx.he),Number(m.giaSan)||0))}`; }
-    if(d) note=d.daTra?`Đã chuyển ${vnd(d.tienChuDo)} ngày ${ngVN(d.ngayTraTien)}`:`Bạn nhận ${vnd(d.tienChuDo)} trước ${ngVN(d.hanTra)}`; if(m.tt==="thue") note=`${th.filter(x=>x.monId===m.id).length} lượt thuê`;
-    return `<div class="irow nosel" style="cursor:default">${phHtml(m)}<div><div class="ttl">${esc(m.ten)}</div><div class="sub">${pillTT(m)}<span>${note}</span></div></div><div class="pr num">${vnd(m.tt==="ban"&&d?d.gia:giaNay(m,t))}</div></div>`; }).join("")}</div>`; }
 function pillTT(m){ const c={cho:"info",dang:"ok",giu:"warn",ban:"",thue:"ok",tra:"bad"}[m.tt]||""; return `<span class="pill ${c}">${esc(TT[m.tt]||m.tt)}</span>`; }
 
 /* =================================================================
@@ -246,10 +401,10 @@ function taoViec(){ const t=homNay(), v=[];
     a:[["chot","Chốt đơn",d.id,"wine"],["tinKhach","Soạn tin Zalo",d.id],h>=24?["boDat","Bỏ giữ",d.id]:null]}); });
   noChuDo().forEach(r=>{ if(r.han<t) v.push({p:1,t:`Trả ${vnd(r.tien)} cho ${r.chuTen||r.chu}`,d:`Quá hạn từ ${ngVN(r.han)} · ${r.ten}`,a:[["moChu","Mở chủ đồ",r.chu,"wine"]]});
     else if(soNgay(t,r.han)<=1) v.push({p:2,t:`Sắp đến hạn trả ${vnd(r.tien)} cho ${r.chuTen||r.chu}`,d:`Hạn ${ngVN(r.han)} · ${r.ten}`,a:[["moChu","Mở chủ đồ",r.chu]]}); });
-  S.dangky.filter(x=>x.tt==="moi").forEach(x=>v.push({p:2,t:`${x.ten} muốn ký gửi ${x.brand} ${x.loai}`.trim(),d:`${x.hinh==="thue"?"Cho thuê":"Bán"} · muốn ${x.giaMuon?vnd(x.giaMuon):"chưa ghi giá"} · ${x.bangChung||""}`,a:[["nhanDK","Nhận đồ",x.id,"wine"],["tinHen","Soạn tin hẹn",x.id],["tuChoi","Từ chối",x.id]]}));
+  S.dangky.filter(x=>x.tt==="moi").forEach(x=>v.push({p:2,t:`${x.ten} muốn ký gửi ${x.brand} ${x.loai}`.trim(),d:moTaDK(x),a:[[x.offer?"nhanDK":"offer",x.offer?"Nhận đồ":"Gửi offer",x.id,"wine"],x.offer?["offer","Sửa offer",x.id]:["tinHen","Soạn tin hẹn",x.id],["tuChoi","Từ chối",x.id]]}));
   S.mon.filter(m=>m.tt==="dang"&&m.ngayDang).forEach(m=>{ const n=soNgay(m.ngayDang,t);
-    if(n>=HAN_NGAY) v.push({p:2,t:`${m.ten} đã treo ${n} ngày`,d:m.nguon==="cherie"?"Đưa vào buổi livestream xả hoặc giảm thêm":"Hết hạn ký gửi: hỏi chủ đồ giảm tiếp hay nhận lại",a:[[m.nguon==="cherie"?"mo":"tinHetHan",m.nguon==="cherie"?"Xem món":"Soạn tin chủ đồ",m.id,"wine"]]});
-    else if(n>=50&&m.nguon!=="cherie") v.push({p:3,t:`${m.ten} còn ${HAN_NGAY-n} ngày hết hạn`,d:`Nhắc ${m.chuTen||m.chuDo} trước để chủ đồ chọn`,a:[["tinHetHan","Soạn tin chủ đồ",m.id]]}); });
+    if(n>=HAN_NGAY) v.push({p:2,t:`${m.ten} đã treo ${n} ngày`,d:!laKG(m)?"Đưa vào buổi livestream xả hoặc giảm thêm":"Hết hạn ký gửi: hỏi chủ đồ giảm tiếp hay nhận lại",a:[[!laKG(m)?"mo":"tinHetHan",!laKG(m)?"Xem món":"Soạn tin chủ đồ",m.id,"wine"]]});
+    else if(n>=50&&laKG(m)) v.push({p:3,t:`${m.ten} còn ${HAN_NGAY-n} ngày hết hạn`,d:`Nhắc ${m.chuTen||m.chuDo} trước để chủ đồ chọn`,a:[["tinHetHan","Soạn tin chủ đồ",m.id]]}); });
   const cho=S.mon.filter(m=>m.tt==="cho"); if(cho.length) v.push({p:3,t:`${cho.length} món chờ chụp ảnh và đăng bán`,d:cho.slice(0,3).map(m=>m.ten).join(", ")+(cho.length>3?"…":""),a:[["goKho","Mở danh sách","cho"]]});
   const sapGiam=S.mon.filter(m=>m.tt==="dang"&&(()=>{const x=lanGiamToi(m,t);return x&&x.con<=3})()); if(sapGiam.length) v.push({p:3,t:`${sapGiam.length} món sẽ tự giảm giá trong 3 ngày tới`,d:"Gợi ý: đưa vào bài đăng hoặc livestream trước khi giảm",a:[["goKho","Xem","dang"]]});
   return v.sort((a,b)=>a.p-b.p); }
@@ -302,23 +457,23 @@ function admKho(b){ const t=homNay(), K=S.kho, q=K.q.trim().toLowerCase();
     <button class="btn line sm" data-a="chonMode">${K.chonMode?"Xong":"Chọn nhiều"}</button><a class="btn wine sm" href="#qt-nhan" data-a="nhanMoi">+ Nhận đồ</a></div>
    <div class="stack" style="gap:8px">${l.length?l.map(m=>{ const n=m.ngayDang&&m.tt==="dang"?soNgay(m.ngayDang,t):null, nx=m.tt==="dang"?lanGiamToi(m,t):null, g=giaNay(m,t);
      return `<div class="irow ${K.chonMode?"":"nosel"}" role="button" tabindex="0" data-a="mo" data-id="${m.id}">${K.chonMode?`<input type="checkbox" data-a="chon" data-id="${m.id}" ${K.chon.has(m.id)?"checked":""} aria-label="Chọn">`:""}${phHtml(m)}
-      <div style="min-width:0"><div class="ttl">${esc(m.ten)} ${m.vidu?'<span class="pill warn">Ví dụ</span>':""}</div><div class="sub">${pillTT(m)}<span class="pill ${m.hang}">${m.hang}</span><span>${esc(m.brand||"")}${m.size?" · "+esc(m.size):""}</span>${m.nguon!=="cherie"?`<span>· ${esc(m.chuTen||m.chuDo)}</span>`:""}
+      <div style="min-width:0"><div class="ttl">${esc(m.ten)} ${m.vidu?'<span class="pill warn">Ví dụ</span>':""}</div><div class="sub">${pillTT(m)}<span class="pill ${m.hang}">${m.hang}</span><span>${esc(m.brand||"")}${m.size?" · "+esc(m.size):""}</span>${laKG(m)?`<span>· ${esc(m.chuTen||m.chuDo)}</span>`:""}
        ${n!=null?`<span class="pill ${n>=HAN_NGAY?"bad":n>=45?"warn":""}">${n} ngày</span>`:""}${!(m.anh||[]).length&&m.tt==="cho"?'<span class="pill info">Thiếu ảnh</span>':""}</div></div>
-      <div class="pr num">${vnd(g)}<small>${nx?`${ngNgan(nx.ngay)} → ${vnd(Math.max(tron(m.giaDang*nx.he),m.nguon!=="cherie"?Number(m.giaSan)||0:0))}`:Number(m.giaDang)>g?"gốc "+vnd(m.giaDang):""}</small></div></div>`; }).join("")
+      <div class="pr num">${vnd(g)}<small>${nx?`${ngNgan(nx.ngay)} → ${vnd(Math.max(tron(m.giaDang*nx.he),laKG(m)?Number(m.giaSan)||0:0))}`:Number(m.giaDang)>g?"gốc "+vnd(m.giaDang):""}</small></div></div>`; }).join("")
      :`<div class="empty"><b>${q?"Không có món khớp":"Chưa có món ở mục này"}</b>${q?"Thử từ khoá khác.":"Bấm Nhận đồ để thêm món đầu tiên."}</div>`}</div>
    ${K.chonMode&&K.chon.size?`<div class="bulk"><span class="num">${K.chon.size} món đã chọn</span><button class="btn sm" data-a="bulkDang">Đăng bán</button><button class="btn sm" data-a="bulkLive">Gắn livestream</button><button class="btn sm" data-a="bulkBo">Bỏ chọn</button></div>`:""}`;
   const so=document.getElementById("khoSort"); so.value=K.sort; so.onchange=()=>{K.sort=so.value;admKho(b)};
   const qi=document.getElementById("khoQ"); qi.oninput=()=>{ K.q=qi.value; clearTimeout(admKho.t); admKho.t=setTimeout(()=>{ admKho(b); const n=document.getElementById("khoQ"); n.focus(); n.setSelectionRange(n.value.length,n.value.length); },200); }; }
 function moMon(id){ const m=S.mon.find(x=>x.id===id); if(!m) return; const t=homNay(), g=giaNay(m,t), n=m.ngayDang?soNgay(m.ngayDang,t):null, nx=m.tt==="dang"?lanGiamToi(m,t):null;
-  const don=S.don.find(d=>d.monId===m.id); const r=m.nguon!=="cherie"?tyLeHH(g,m.hhRieng):null;
+  const don=S.don.find(d=>d.monId===m.id); const r=laKG(m)?tyLeHH(g,m.hhRieng):null;
   const c=m.tinhTrang||{}, loi=LOI.filter(([k])=>c[k]).map(x=>x[1]);
   const acts=[]; const B=(a,tx,cls)=>acts.push(`<button class="btn sm ${cls||"line"}" data-a="${a}" data-id="${m.id}">${tx}</button>`);
   if(m.tt==="cho") m.nguon==="kyguithue"?B("vaoThue","Đưa vào kho cho thuê","wine"):B("dang","Đăng bán","wine");
   if(m.tt==="dang"||m.tt==="giu") B("ban","Ghi bán","wine");
   if(m.tt==="giu") B("boGiu","Bỏ giữ");
   if(m.tt==="thue") B("luotThue","Ghi lượt thuê","wine");
-  B("sua","Sửa"); if(m.tt==="dang"&&m.nguon!=="cherie") B("tinHetHan","Soạn tin chủ đồ");
-  if(m.nguon!=="cherie"&&["cho","dang","thue","giu"].includes(m.tt)) B("traDo","Trả chủ đồ");
+  B("sua","Sửa"); if(m.tt==="dang"&&laKG(m)) B("tinHetHan","Soạn tin chủ đồ");
+  if(laKG(m)&&["cho","dang","thue","giu"].includes(m.tt)) B("traDo","Trả chủ đồ");
   if(m.vidu||m.tt==="cho") B("xoa","Xoá");
   openSheet(`<div class="row"><div><div class="eyebrow">${esc(m.ma||"")} · ${NGUON[m.nguon]}</div><h2>${esc(m.ten)}</h2></div><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
    ${(m.anh||[]).length?`<div class="gal">${m.anh.map(i=>`<div class="ph" style="flex-basis:min(42%,180px)"><img src="${anh(i)}" alt=""></div>`).join("")}</div>`:`<div class="banner info">Chưa có ảnh. Bấm Sửa để thêm ảnh trước khi đăng.</div>`}
@@ -331,8 +486,8 @@ function moMon(id){ const m=S.mon.find(x=>x.id===id); if(!m) return; const t=hom
      ${Number(m.giaSan)?`<div><span>Giá sàn chủ đồ</span><span>${vnd(m.giaSan)}</span></div>`:""}
      ${r!=null?`<div><span>Phí ${Math.round(r*1000)/10}% · chủ đồ nhận</span><span>${vnd(g-Math.round(g*r))}</span></div>`:""}
      <div><span>${don?"Đã bán":"Giá hiện tại"}</span><span>${vnd(don?don.gia:g)}</span></div></div>
-     ${nx?`<p class="small muted" style="margin:8px 0 0">Ngày ${ngVN(nx.ngay)} (còn ${nx.con} ngày) tự giảm còn ${vnd(Math.max(tron(m.giaDang*nx.he),m.nguon!=="cherie"?Number(m.giaSan)||0:0))}.</p>`:""}</div>
-    <div class="card stack" style="gap:8px"><b>${m.nguon==="cherie"?"Nguồn":"Chủ đồ"}</b>${m.nguon==="cherie"?`<div class="small">Mã đồ tổ hợp: ${esc(m.maGoc||"—")}<br>Đã thuê: ${esc(m.soLuot||0)} lượt</div>`:`<div class="small">${esc(m.chuTen||"")} · <span class="num">${esc(m.chuDo)}</span><br>Bằng chứng: ${esc(m.bangChung||"—")}</div><button class="btn sm line" data-a="moChu" data-v="${esc(m.chuDo)}">Mở hồ sơ chủ đồ</button>`}
+     ${nx?`<p class="small muted" style="margin:8px 0 0">Ngày ${ngVN(nx.ngay)} (còn ${nx.con} ngày) tự giảm còn ${vnd(Math.max(tron(m.giaDang*nx.he),laKG(m)?Number(m.giaSan)||0:0))}.</p>`:""}</div>
+    <div class="card stack" style="gap:8px"><b>${!laKG(m)?"Nguồn":"Chủ đồ"}</b>${!laKG(m)?`<div class="small">Mã đồ tổ hợp: ${esc(m.maGoc||"—")}<br>Đã thuê: ${esc(m.soLuot||0)} lượt</div>`:`<div class="small">${esc(m.chuTen||"")} · <span class="num">${esc(m.chuDo)}</span><br>Bằng chứng: ${esc(m.bangChung||"—")}</div><button class="btn sm line" data-a="moChu" data-v="${esc(m.chuDo)}">Mở hồ sơ chủ đồ</button>`}
      <b>Lịch sử</b><div class="tl">${(m.lichSu||[{n:m.ngayNhan,v:"Nhận đồ"}]).slice().reverse().map(x=>`<div><small class="num">${ngVN(x.n)}</small>${esc(x.v)}</div>`).join("")}</div></div></div>
    ${m.moTa?`<div class="card"><b>Mô tả cho khách</b><p style="margin:6px 0 0">${esc(m.moTa)}</p></div>`:""}`); }
 
@@ -348,9 +503,11 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
     ${W.buoc<5?`<button class="btn wine" data-a="wTiep">Tiếp tục</button>`:`<div class="row"><button class="btn line" data-a="wLuu" data-v="cho">Lưu, đăng sau</button><button class="btn wine" data-a="wLuu" data-v="dang" ${(d.anh||[]).length&&d.giaDang?"":"disabled"}>Lưu và đăng bán</button></div>`}</div></div>`;
   const wb=document.getElementById("wb");
   if(W.buoc===1){
-    wb.innerHTML=`<div class="choose">${Object.entries({cherie:["Đầm CHÉRIE","Hết vòng đời thuê hoặc lỗi mốt"],kygui:["Ký gửi bán","Đồ của khách, hưởng hoa hồng"],kyguithue:["Ký gửi cho thuê","Vào kho thuê, chia 50/50"]}).map(([k,[a,s]])=>`<button data-a="wNguon" data-v="${k}" aria-pressed="${d.nguon===k}"><b>${a}</b><span>${s}</span></button>`).join("")}</div>
-     ${d.nguon!=="cherie"?`<div class="card stack"><b>Chủ đồ</b><div class="g2"><label class="f">Số Zalo<input id="wSdt" inputmode="tel" value="${esc(d.chuDo||"")}" list="dsChu"></label><label class="f">Tên<input id="wChuTen" value="${esc(d.chuTen||"")}"></label></div>
+    wb.innerHTML=`<div class="choose">${Object.entries({cherie:["Đầm CHÉRIE","Hết vòng đời thuê hoặc lỗi mốt"],mualai:["Tiệm mua lại","Mua đứt hoặc đổi tín dụng"],kygui:["Ký gửi bán","Đồ của khách, hưởng hoa hồng"],kyguithue:["Ký gửi cho thuê","Vào kho thuê, chia 50/50"]}).map(([k,[a,s]])=>`<button data-a="wNguon" data-v="${k}" aria-pressed="${d.nguon===k}"><b>${a}</b><span>${s}</span></button>`).join("")}</div>
+     ${laKG(d)?`<div class="card stack"><b>Chủ đồ</b><div class="g2"><label class="f">Số Zalo<input id="wSdt" inputmode="tel" value="${esc(d.chuDo||"")}" list="dsChu"></label><label class="f">Tên<input id="wChuTen" value="${esc(d.chuTen||"")}"></label></div>
        <datalist id="dsChu">${dsChuDo().map(c=>`<option value="${esc(c.sdt)}">${esc(c.ten)}</option>`).join("")}</datalist><div id="wChuInfo" class="small muted"></div>
+       <label class="f">Bằng chứng mua<select id="wBC">${["Hóa đơn","Còn tag","Ảnh đơn hàng online","Chưa có"].map(x=>`<option ${d.bangChung===x?"selected":""}>${x}</option>`).join("")}</select></label></div>`
+     :d.nguon==="mualai"?`<div class="card stack"><b>Tiệm mua lại</b><div class="g2"><label class="f">Giá tiệm đã trả (tiền mặt hoặc tín dụng)<input id="wGV" inputmode="numeric" value="${d.giaVon||""}"></label><label class="f">Mua từ (tên, số Zalo)<input id="wMuaTu" value="${esc(d.ghiChuKhach||"")}"></label></div>
        <label class="f">Bằng chứng mua<select id="wBC">${["Hóa đơn","Còn tag","Ảnh đơn hàng online","Chưa có"].map(x=>`<option ${d.bangChung===x?"selected":""}>${x}</option>`).join("")}</select></label></div>`
      :`<div class="card"><label class="f">Mã đồ trong tổ hợp (để nối với kho Thuê đầm)<input id="wMaGoc" placeholder="CH-PR-001-S" value="${esc(d.maGoc||"")}"></label></div>`}`;
     const s=document.getElementById("wSdt"); if(s){ const show=()=>{ const c=dsChuDo().find(x=>x.sdt===sdt(s.value)); document.getElementById("wChuInfo").innerHTML=c?`Khách cũ · ${c.mon.length} món đã gửi${c.no?` · đang chờ nhận ${vnd(c.no)}`:""}`:(sdt(s.value).length>=9?"Chủ đồ mới":""); if(c&&!val("wChuTen")) document.getElementById("wChuTen").value=c.ten||""; }; s.oninput=show; show(); }
@@ -359,7 +516,9 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
     wb.innerHTML=`<div class="g2"><label class="f">Tên món<input id="wTen" value="${esc(d.ten||"")}" placeholder="Pivoine Noire, Túi Coach Tabby…"></label><label class="f">Thương hiệu<input id="wBrand" value="${esc(d.brand||"")}" list="dsBrand"></label>
      <label class="f">Loại<input id="wLoai" value="${esc(d.loai||"")}" placeholder="Đầm xoè, đầm midi, túi…"></label><label class="f">Size<input id="wSize" value="${esc(d.size||"")}"></label>
      <label class="f">Màu<input id="wMau" value="${esc(d.mau||"")}"></label><label class="f">Chất liệu<input id="wCL" value="${esc(d.chatLieu||"")}"></label>
-     <label class="f">${d.nguon==="cherie"?"Số lượt đã cho thuê":"Số lần chủ đồ đã mặc"}<input id="wLuot" inputmode="numeric" value="${esc(d.soLuot??"")}"></label></div>
+     <label class="f">Danh mục trên web<select id="wDM">${DM.map(([k,t])=>`<option value="${k}" ${danhMuc(d)===k?"selected":""}>${t}</option>`).join("")}</select></label>
+     <label class="f">Phân khúc<select id="wPK"><option value="">Tự xếp theo hãng và giá</option>${Object.entries(PK).map(([k,x])=>`<option value="${k}" ${d.phanKhuc===k?"selected":""}>${x.ten}</option>`).join("")}</select></label>
+     <label class="f">${!laKG(d)?"Số lượt đã cho thuê":"Số lần chủ đồ đã mặc"}<input id="wLuot" inputmode="numeric" value="${esc(d.soLuot??"")}"></label></div>
      <datalist id="dsBrand">${[...new Set(S.mon.map(m=>m.brand).filter(Boolean).concat(["SIXDO","D.CHIC","Elise","NEM","Chanel","Dior","Coach","Gucci","Louis Vuitton","Zara"]))].map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`; }
   if(W.buoc===3){ const c=d.tinhTrang||{}, gy=hangGoiY(c,d.soLuot);
     wb.innerHTML=`<div class="stack"><b>Kiểm tra tình trạng</b><div class="checks">${TOT.concat(LOI).map(([k,tx])=>`<label><input type="checkbox" data-tt="${k}" ${c[k]?"checked":""}>${tx}</label>`).join("")}</div>
@@ -372,7 +531,7 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
     veThumbs();
     const fi=document.getElementById("wFile"); if(fi) fi.onchange=async()=>{ for(const f of [...fi.files].slice(0,8)){ try{ toast("Đang tải ảnh…"); const bl=await nenAnh(f); const r=await S.assets.upload(bl,{type:"image/jpeg"}); d.anh.push(r.id); W.files.push(bl); veThumbs(); }catch(e){ toast(e&&e.code==="too_large"?"Ảnh quá lớn.":"Chưa tải được ảnh, thử lại."); } } fi.value=""; veWizard(); };
     wb.querySelectorAll("[data-tt]").forEach(x=>x.onchange=()=>{ d.tinhTrang[x.dataset.tt]=x.checked; d.loi=val("wLoi"); veWizard(); }); }
-  if(W.buoc===4){ const ky=d.nguon!=="cherie";
+  if(W.buoc===4){ const ky=laKG(d);
     wb.innerHTML=`<div class="g2"><label class="f">Giá niêm yết hãng${ky?" / giá chủ đồ mua":""}<input id="wNY" inputmode="numeric" value="${d.giaNiemYet||""}"></label>
       <label class="f">Giá sale chính hãng hiện tại (nếu có)<input id="wSale" inputmode="numeric" value="${d.giaSale||""}"></label>
       <label class="f">Giá đăng bán${d.nguon==="kyguithue"?" (để trống nếu chỉ cho thuê)":""}<input id="wGia" inputmode="numeric" value="${d.giaDang||""}"></label>
@@ -381,7 +540,7 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
      <div class="stack"><label class="f">Mô tả cho khách<textarea id="wMoTa">${esc(d.moTa||"")}</textarea></label>
       ${S.sample?`<div class="row"><button class="btn sm soft" data-a="aiMoTa">✦ AI viết mô tả</button><span class="small muted" id="aiMoTaSt"></span></div>`:""}</div>`;
     const tinh=()=>{ luuBuoc(); const k=document.getElementById("wGiaKq"), g=Number(d.giaDang)||0;
-      if(d.nguon==="cherie"){ const gy=giaGoiY(d); k.innerHTML=d.giaNiemYet?`<div class="breakdown num"><div><span>${HANG[d.hang].ten}: ${Math.round(HANG[d.hang].pct*100)}% × ${vnd(d.giaNiemYet)}</span><span>${vnd(tron(d.giaNiemYet*HANG[d.hang].pct))}</span></div>${d.giaSale?`<div><span>Trần 70% giá sale ${vnd(d.giaSale)}</span><span>${vnd(tron(d.giaSale*TRAN_SALE))}</span></div>`:""}<div><span>Giá gợi ý</span><span>${vnd(gy)}</span></div></div>
+      if(!laKG(d)){ const gy=giaGoiY(d); k.innerHTML=d.giaNiemYet?`<div class="breakdown num"><div><span>${HANG[d.hang].ten}: ${Math.round(HANG[d.hang].pct*100)}% × ${vnd(d.giaNiemYet)}</span><span>${vnd(tron(d.giaNiemYet*HANG[d.hang].pct))}</span></div>${d.giaSale?`<div><span>Trần 70% giá sale ${vnd(d.giaSale)}</span><span>${vnd(tron(d.giaSale*TRAN_SALE))}</span></div>`:""}<div><span>Giá gợi ý</span><span>${vnd(gy)}</span></div></div>
         <div class="row" style="margin-top:8px">${g!==gy?`<button class="btn sm wine" data-a="wDungGY" data-v="${gy}">Dùng ${vnd(gy)}</button>`:'<span class="pill ok">Đang dùng giá gợi ý</span>'}<span class="small muted">Lịch tự giảm: ngày 30 còn ${vnd(tron((g||gy)*.8))}, ngày 45 còn ${vnd(tron((g||gy)*.65))}</span></div>`:`<span class="small muted">Nhập giá niêm yết để tính giá gợi ý.</span>`; }
       else { const r=tyLeHH(g,d.hhRieng),h=Math.round(g*r); k.innerHTML=g?(g<GIA_TOI_THIEU?`<span class="pill warn">Dưới giá tối thiểu ${vnd(GIA_TOI_THIEU)}</span>`:`<div class="breakdown num"><div><span>Phí ${Math.round(r*1000)/10}%</span><span>${vnd(h)}</span></div><div><span>Ngày 30 / 45 tự giảm còn</span><span>${vnd(Math.max(tron(g*.8),d.giaSan||0))} / ${vnd(Math.max(tron(g*.65),d.giaSan||0))}</span></div><div><span>Chủ đồ nhận nếu bán giá đăng</span><span>${vnd(g-h)}</span></div></div>${d.giaSan&&d.giaSan>g?'<span class="pill bad">Giá sàn cao hơn giá đăng</span>':""}`)
         :(d.nguon==="kyguithue"?`Mỗi lượt thuê chia ${CHIA_THUE*100}% cho chủ đồ.`:`<span class="small muted">Nhập giá đăng bán.</span>`); } };
@@ -392,12 +551,14 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
      <div class="small muted">${esc(d.brand||"")}${d.mau?" · "+esc(d.mau):""}${d.chuDo?" · Chủ đồ "+esc(d.chuTen||"")+" "+esc(d.chuDo):""}</div>
      <div class="num"><b>${g?vnd(g):"Chưa có giá"}</b>${d.giaNiemYet?` <s class="muted small">${vnd(d.giaNiemYet)}</s>`:""}</div><div class="small muted">${(d.anh||[]).length} ảnh</div></div></div>
      ${!(d.anh||[]).length?`<div class="banner">Chưa có ảnh: món sẽ lưu ở "Chờ đăng".</div>`:""}${!d.ten?`<div class="banner bad">Cần tên món (bước 2).</div>`:""}
-     ${d.nguon!=="cherie"&&sdt(d.chuDo).length<9?`<div class="banner bad">Cần số Zalo chủ đồ (bước 1).</div>`:""}`; }
+     ${laKG(d)&&sdt(d.chuDo).length<9?`<div class="banner bad">Cần số Zalo chủ đồ (bước 1).</div>`:""}`; }
 }
 function veThumbs(){ const el=document.getElementById("wThumbs"); if(!el) return; const d=S.W.d; el.innerHTML=(d.anh||[]).map((a,i)=>`<div class="t"><div class="ph"><img src="${anh(a)}" alt="Ảnh ${i+1}"></div><button type="button" data-a="wBoAnh" data-v="${i}" aria-label="Bỏ ảnh">×</button></div>`).join("")||`<span class="small muted">Chưa có ảnh.</span>`; }
 function luuBuoc(){ const W=S.W; if(!W) return; const d=W.d, g=id=>document.getElementById(id);
   if(g("wSdt")){ d.chuDo=sdt(val("wSdt")); d.chuTen=val("wChuTen").trim(); d.bangChung=val("wBC"); }
   if(g("wMaGoc")) d.maGoc=val("wMaGoc").trim();
+  if(g("wGV")){ d.giaVon=tien(val("wGV")); d.ghiChuKhach=val("wMuaTu").trim(); d.bangChung=val("wBC"); }
+  if(g("wDM")){ d.danhMuc=val("wDM"); d.phanKhuc=val("wPK"); }
   if(g("wTen")){ d.ten=val("wTen").trim(); d.brand=val("wBrand").trim(); d.loai=val("wLoai").trim(); d.size=val("wSize").trim(); d.mau=val("wMau").trim(); d.chatLieu=val("wCL").trim(); d.soLuot=tien(val("wLuot")); }
   if(g("wLoi")) d.loi=val("wLoi").trim();
   if(g("wNY")){ d.giaNiemYet=tien(val("wNY")); d.giaSale=tien(val("wSale")); d.giaDang=tien(val("wGia")); if(g("wSan")){ d.giaSan=tien(val("wSan")); const h=String(val("wHH")).replace(",",".").trim(); d.hhRieng=h===""?null:Number(h); } }
@@ -405,13 +566,13 @@ function luuBuoc(){ const W=S.W; if(!W) return; const d=W.d, g=id=>document.getE
 async function nenAnh(file){ try{ const bmp=await createImageBitmap(file); const k=Math.min(1,1400/Math.max(bmp.width,bmp.height)); const c=document.createElement("canvas"); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k); c.getContext("2d").drawImage(bmp,0,0,c.width,c.height); const b=await new Promise(r=>c.toBlob(r,"image/jpeg",.84)); return b||file; }catch(e){ return file; } }
 async function luuWizard(dang){ luuBuoc(); const W=S.W, d=W.d;
   if(!d.ten){ W.buoc=2; veWizard(); toast("Cần tên món."); return; }
-  if(d.nguon!=="cherie"&&sdt(d.chuDo).length<9){ W.buoc=1; veWizard(); toast("Cần số Zalo chủ đồ."); return; }
+  if(laKG(d)&&sdt(d.chuDo).length<9){ W.buoc=1; veWizard(); toast("Cần số Zalo chủ đồ."); return; }
   if(d.nguon==="kygui"&&d.giaDang&&d.giaDang<GIA_TOI_THIEU){ W.buoc=4; veWizard(); toast("Giá đồ ký gửi cần từ "+vnd(GIA_TOI_THIEU)+"."); return; }
   const data=Object.assign({},d); delete data.dangkyId;
-  if(d.nguon==="cherie"){ data.chuDo=""; data.chuTen=""; data.giaSan=0; data.hhRieng=null; }
+  if(!laKG(d)){ data.chuDo=""; data.chuTen=""; data.giaSan=0; data.hhRieng=null; }
   try{
     if(W.id){ const m=S.mon.find(x=>x.id===W.id)||{}; data.lichSu=lichSu(m,"Sửa thông tin"); await S.db.doc("mon/"+W.id).update(data); toast("Đã lưu thay đổi."); }
-    else{ const t=homNay(); data.ma=taoMa(data); data.ngayNhan=t; data.lichSu=[{n:t,v:"Nhận đồ"+(d.nguon!=="cherie"?" từ "+(d.chuTen||d.chuDo):"")}];
+    else{ const t=homNay(); data.ma=taoMa(data); data.ngayNhan=t; data.lichSu=[{n:t,v:"Nhận đồ"+(laKG(d)?" từ "+(d.chuTen||d.chuDo):"")}];
       if(dang&&d.nguon==="kyguithue"){ data.tt="thue"; data.ngayDang=""; data.lichSu.push({n:t,v:"Vào kho cho thuê"}); }
       else if(dang){ data.tt="dang"; data.ngayDang=t; data.lichSu.push({n:t,v:"Đăng bán "+vnd(d.giaDang)}); } else { data.tt="cho"; data.ngayDang=""; }
       await S.db.collection("mon").add(data); if(d.dangkyId) await S.db.doc("dangky/"+d.dangkyId).update({tt:"danhan"});
@@ -419,7 +580,7 @@ async function luuWizard(dang){ luuBuoc(); const W=S.W, d=W.d;
     S.W=null; S.kho.tt=dang?(d.nguon==="kyguithue"?"thue":"dang"):"cho"; location.hash="qt-kho";
   }catch(e){ loiGhi(e); } }
 function taoMa(d){ const t=homNay().replace(/-/g,"").slice(2), r=Math.random().toString(36).slice(2,5).toUpperCase();
-  if(d.nguon==="cherie") return d.maGoc?"SC-"+d.maGoc:"SC-"+t+"-"+r; return (d.nguon==="kygui"?"KG-":"KT-")+t+"-"+String(d.chuDo||"").slice(-4)+r.slice(0,2); }
+  if(d.nguon==="mualai") return "ML-"+t+"-"+r; if(!laKG(d)) return d.maGoc?"SC-"+d.maGoc:"SC-"+t+"-"+r; return (d.nguon==="kygui"?"KG-":"KT-")+t+"-"+String(d.chuDo||"").slice(-4)+r.slice(0,2); }
 /* ---------- Trợ lý AI ---------- */
 async function aiAnh(btn){ const W=S.W, out=document.getElementById("aiOut"); btn.disabled=true; out.textContent="Đang xem ảnh…";
   try{ const imgs=W.files.slice(0,4); const r=await S.sample.json(`Bạn là chuyên viên kiểm đồ secondhand của tiệm CHÉRIE Seconde. Ảnh là một món thời trang (${W.d.brand||"chưa rõ hãng"}, ${W.d.loai||"chưa rõ loại"}). Hãy nhìn ảnh và trả lời CHỈ bằng JSON:
@@ -460,16 +621,16 @@ function moChot(datId){ const x=S.dathang.find(y=>y.id===datId); if(!x) return;
   document.getElementById("fChot").addEventListener("submit",async ev=>{ ev.preventDefault(); const kenh=val("cKenh"), ngay=val("cNgay")||homNay();
     try{ for(const [n,i] of (x.items||[]).entries()){ const m=S.mon.find(y=>y.id===i.monId); if(!m) continue; await ghiBan(m,tien(val("cGia"+n))||i.gia,kenh,ngay,x.sdt,0); }
       await S.db.doc("dathang/"+x.id).update({tt:"chot"}); closeSheet(); toast("Đã chốt đơn của "+x.ten+"."); }catch(e){ loiGhi(e); } }); }
-async function ghiBan(m,gia,kenh,ngay,khach,thueDaTra){ const phi=kenh==="Shopee"?Math.round(gia*PHI_SHOPEE):0; let hh=gia,chu=0; if(m.nguon!=="cherie"){ hh=Math.round(gia*tyLeHH(gia,m.hhRieng)); chu=gia-hh; }
+async function ghiBan(m,gia,kenh,ngay,khach,thueDaTra){ const phi=kenh==="Shopee"?Math.round(gia*PHI_SHOPEE):0; let hh=gia,chu=0; if(laKG(m)){ hh=Math.round(gia*tyLeHH(gia,m.hhRieng)); chu=gia-hh; }
   await S.db.collection("don").add({monId:m.id,ma:m.ma||"",ten:m.ten,nguon:m.nguon,gia,kenh,ngayGiao:ngay,ngayDang:m.ngayDang||"",khach:khach||"",tiemHuong:hh,phiSan:phi,chuDo:m.chuDo||"",chuTen:m.chuTen||"",tienChuDo:chu,hanTra:chu?hanTra(ngay):"",daTra:false,ngayTraTien:"",tienThueDaTra:thueDaTra||0});
   await S.db.doc("mon/"+m.id).update({tt:"ban",ngayBan:ngay,lichSu:lichSu(m,`Bán ${vnd(gia)} qua ${kenh}`)}); }
 function moBan(id){ const m=S.mon.find(x=>x.id===id); if(!m) return; const t=homNay(), g=giaNay(m,t);
   openSheet(`<div class="row"><h2>Ghi bán · ${esc(m.ten)}</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
-  <form id="fBan" class="stack"><div class="g2"><label class="f">Giá khách trả<input id="bGia" inputmode="numeric" value="${g}"></label><label class="f">Kênh<select id="bKenh">${KENH.filter(k=>k!=="Thuê rồi mua"||m.nguon==="cherie").map(k=>`<option>${k}</option>`).join("")}</select></label>
+  <form id="fBan" class="stack"><div class="g2"><label class="f">Giá khách trả<input id="bGia" inputmode="numeric" value="${g}"></label><label class="f">Kênh<select id="bKenh">${KENH.filter(k=>k!=="Thuê rồi mua"||!laKG(m)).map(k=>`<option>${k}</option>`).join("")}</select></label>
    <label class="f">Ngày giao<input id="bNgay" type="date" value="${t}"></label><label class="f">Số Zalo khách<input id="bSdt" inputmode="tel"></label><label class="f" id="bThueW" hidden>Tiền thuê khách đã trả<input id="bThue" inputmode="numeric"></label></div>
   <div id="bKq" class="card"></div><button class="btn wine" type="submit">Lưu đơn bán</button></form>`);
   const tinh=()=>{ const gia=tien(val("bGia")),k=val("bKenh"),phi=k==="Shopee"?Math.round(gia*PHI_SHOPEE):0; document.getElementById("bThueW").hidden=k!=="Thuê rồi mua"; let s="";
-    if(m.nguon==="cherie") s=`<div class="breakdown num"><div><span>Khách trả</span><span>${vnd(gia)}</span></div>${phi?`<div><span>Phí Shopee ~25,3%</span><span>−${vnd(phi)}</span></div>`:""}<div><span>Tiệm thực nhận</span><span>${vnd(gia-phi)}</span></div></div>`;
+    if(!laKG(m)) s=`<div class="breakdown num"><div><span>Khách trả</span><span>${vnd(gia)}</span></div>${phi?`<div><span>Phí Shopee ~25,3%</span><span>−${vnd(phi)}</span></div>`:""}<div><span>Tiệm thực nhận</span><span>${vnd(gia-phi)}</span></div></div>`;
     else { const r=tyLeHH(gia,m.hhRieng),h=Math.round(gia*r); s=`<div class="breakdown num"><div><span>Hoa hồng ${Math.round(r*1000)/10}%</span><span>${vnd(h)}</span></div>${phi?`<div><span>Phí Shopee (tiệm chịu)</span><span>−${vnd(phi)}</span></div>`:""}<div><span>Trả chủ đồ trước ${ngVN(hanTra(val("bNgay")||t))}</span><span>${vnd(gia-h)}</span></div></div>${Number(m.giaSan)>0&&gia<m.giaSan?`<span class="pill bad">Thấp hơn giá sàn ${vnd(m.giaSan)}</span>`:""}`; }
     document.getElementById("bKq").innerHTML=s; };
   document.getElementById("bThue").oninput=()=>{ document.getElementById("bGia").value=Math.max(0,tron(m.giaNiemYet*THUE_ROI_MUA)-tien(val("bThue"))); tinh(); };
@@ -491,8 +652,8 @@ function dsChuDo(){ const map={}; const add=(s,ten)=>{ if(!s) return null; map[s
   S.don.filter(d=>d.daTra&&d.tienChuDo).forEach(d=>add(d.chuDo,d.chuTen).da+=d.tienChuDo); S.thue.filter(x=>x.daTra).forEach(x=>add(x.chuDo,x.chuTen).da+=x.chiaChuDo);
   return Object.values(map).sort((a,b)=>b.qh-a.qh||b.no-a.no||b.mon.length-a.mon.length); }
 function admChu(b){ const moi=S.dangky.filter(x=>x.tt==="moi"), l=dsChuDo().filter(c=>c.mon.length||c.dk.some(x=>x.tt!=="tuchoi")), tong=l.reduce((s,c)=>s+c.no,0);
-  b.innerHTML=`${moi.length?`<section class="stack"><h3>Đăng ký mới <span class="pill wine">${moi.length}</span></h3>${moi.map(x=>`<div class="task p2"><span class="bar"></span><div><div class="t">${esc(x.ten)} · ${esc(x.brand)} ${esc(x.loai)}</div><div class="d num">${esc(x.sdt)} · ${x.hinh==="thue"?"Cho thuê":"Bán"} · muốn ${x.giaMuon?vnd(x.giaMuon):"—"} · sàn ${x.giaSan?vnd(x.giaSan):"—"} · ${esc(x.bangChung||"")}${x.moTa?" · "+esc(x.moTa):""}</div></div>
-    <div class="acts"><button class="btn sm wine" data-a="nhanDK" data-id="${x.id}">Nhận đồ</button><button class="btn sm line" data-a="tinHen" data-id="${x.id}">Soạn tin hẹn</button><button class="btn sm line" data-a="tuChoi" data-id="${x.id}">Từ chối</button></div></div>`).join("")}</section>`:""}
+  b.innerHTML=`${moi.length?`<section class="stack"><h3>Đăng ký mới <span class="pill wine">${moi.length}</span></h3>${moi.map(x=>`<div class="task p2"><span class="bar"></span><div><div class="t">${esc(x.ten)} · ${esc(x.brand)} ${esc(x.loai)}</div><div class="d num">${esc(x.sdt)} · ${moTaDK(x)}${x.moTa?" · "+esc(x.moTa):""}</div></div>
+    <div class="acts"><button class="btn sm ${x.offer?"line":"wine"}" data-a="offer" data-id="${x.id}">${x.offer?"Sửa offer":"Gửi offer"}</button><button class="btn sm ${x.offer?"wine":"line"}" data-a="nhanDK" data-id="${x.id}">Nhận đồ</button><button class="btn sm line" data-a="tuChoi" data-id="${x.id}">Từ chối</button></div></div>`).join("")}</section>`:""}
    <section class="stack"><div class="row" style="justify-content:space-between"><h3>Chủ đồ</h3><span class="small muted num">Đang chờ trả tổng ${vnd(tong)}</span></div>
    ${l.length?`<div class="tbl"><table><thead><tr><th>Chủ đồ</th><th class="r">Đang bán</th><th class="r">Đã bán</th><th class="r">Chờ trả</th><th class="r">Đã trả</th></tr></thead><tbody>${l.map(c=>`<tr class="row-chu" data-a="moChu" data-v="${c.sdt}" tabindex="0"><td><b>${esc(c.ten||"—")}</b><div class="small muted num">${esc(c.sdt)}</div></td><td class="r num">${c.mon.filter(m=>m.tt==="dang"||m.tt==="thue").length}</td><td class="r num">${c.mon.filter(m=>m.tt==="ban").length}</td><td class="r num">${c.no?vnd(c.no):"—"}${c.qh?` <span class="pill bad">${c.qh} quá hạn</span>`:""}</td><td class="r num">${c.da?vnd(c.da):"—"}</td></tr>`).join("")}</tbody></table></div>`
     :`<div class="empty"><b>Chưa có chủ đồ ký gửi</b>Khi nhận đồ ký gửi, hồ sơ chủ đồ tự tạo theo số Zalo.</div>`}</section>`; }
@@ -506,6 +667,19 @@ function moChu(so){ const c=dsChuDo().find(x=>x.sdt===so); if(!c) return; const 
 /* ---------- Tin Zalo soạn sẵn ---------- */
 function moTin(tieuDe,noiDung){ openSheet(`<div class="row"><h2>${esc(tieuDe)}</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div><div class="msg" id="msgTxt">${esc(noiDung)}</div><div class="row"><button class="btn wine" data-a="chepTin">Chép tin</button><span class="small muted">Dán vào Zalo ${ZALO.slice(0,0)}của khách.</span></div>`); }
 function tinKhach(id){ const x=S.dathang.find(y=>y.id===id); if(!x) return; moTin("Tin gửi "+x.ten,`Chào ${x.ten}, CHÉRIE Seconde đang giữ ${(x.items||[]).length} món cho bạn:\n${(x.items||[]).map(i=>`• ${i.ten}: ${vnd(i.gia)}`).join("\n")}\nTổng: ${vnd(x.tong)} (chưa gồm phí ship).\nTiệm gửi mã VietQR ngay sau tin này, bạn chuyển khoản trong 24 giờ để tiệm đóng gói nhé. Cảm ơn bạn đã chọn CHÉRIE!`); }
+const HINH={ban:"Ký gửi bán",thue:"Ký gửi cho thuê",bandut:"Bán đứt cho tiệm",tindung:"Đổi tín dụng CHÉRIE"};
+function moTaDK(x){ return `${HINH[x.hinh]||"Ký gửi"}${x.hangKhach?" · tự chấm hạng "+x.hangKhach:""}${x.uocTinh?" · web ước tính bán "+vnd(x.uocTinh):""}${x.offer?" · đã offer "+vnd(x.offer):""} · muốn ${x.giaMuon?vnd(x.giaMuon):"—"}${x.giaSan?" · sàn "+vnd(x.giaSan):""} · ${x.bangChung||""}`; }
+function moOffer(id){ const x=S.dangky.find(y=>y.id===id); if(!x) return; const pk=x.phanKhuc||phanKhuc({brand:x.brand,giaNiemYet:x.giaMua}), est=Number(x.uocTinh)||0, md=tron(est*MUA_DUT[pk]);
+  openSheet(`<div class="row"><h2>Gửi offer · ${esc(x.ten)}</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
+   <div class="small muted">${esc(x.brand)} ${esc(x.loai)} · ${moTaDK(x)}</div>
+   ${est?`<div class="breakdown num"><div><span>Giá bán dự kiến (web ước tính)</span><span>${vnd(est)}</span></div><div><span>Ký gửi: chủ đồ nhận khi bán</span><span>${vnd(est-Math.round(est*tyLeHH(est)))}</span></div><div><span>Bán đứt ${Math.round(MUA_DUT[pk]*100)}%</span><span>${vnd(md)}</span></div><div><span>Tín dụng (+${Math.round((TIN_DUNG-1)*100)}%)</span><span>${vnd(tron(md*TIN_DUNG))}</span></div></div>`:""}
+   <label class="f">Giá offer chính thức (sau khi xem ảnh)<input id="ofGia" inputmode="numeric" value="${x.offer||(x.hinh==="bandut"?md:x.hinh==="tindung"?tron(md*TIN_DUNG):"")||""}"></label>
+   <div class="row"><button class="btn wine" id="ofLuu">Lưu và soạn tin Zalo</button></div>`);
+  document.getElementById("ofLuu").onclick=async()=>{ const g=tien(val("ofGia")); if(!g){ toast("Nhập giá offer."); return; }
+    try{ await S.db.doc("dangky/"+id).update({offer:g,tt:"moi"}); const txt=x.hinh==="bandut"?`CHÉRIE Seconde trả bạn ${vnd(g)} tiền mặt cho ${x.brand} ${x.loai}, chuyển khoản trong 24 giờ sau khi tiệm nhận và kiểm đồ.`:x.hinh==="tindung"?`CHÉRIE Seconde đổi ${x.brand} ${x.loai} của bạn lấy ${vnd(g)} tín dụng, dùng cho thuê đầm, CHÉRIE Office, Care và Seconde.`:x.hinh==="thue"?`Tiệm nhận ${x.brand} ${x.loai} vào kho cho thuê, bạn hưởng 50% mỗi lượt thuê. Giá bán đề xuất nếu khách muốn mua: ${vnd(g)}.`:`Tiệm đề xuất đăng bán ${x.brand} ${x.loai} giá ${vnd(g)}. Bạn nhận ${vnd(g-Math.round(g*tyLeHH(g)))} khi bán (phí ${Math.round(tyLeHH(g)*100)}%), giữ đồ tối đa ${HAN_NGAY} ngày.`;
+      moTin("Tin offer gửi "+x.ten,`Chào ${x.ten}, cảm ơn bạn đã gửi ảnh.
+${txt}
+Offer giữ trong 7 ngày. Bạn đồng ý thì nhắn tiệm hẹn ngày nhận đồ (tận nơi thứ 2, thứ 6 ở Đà Nẵng hoặc gửi xe toàn quốc).`); }catch(e){ loiGhi(e); } }; }
 function tinHen(id){ const x=S.dangky.find(y=>y.id===id); if(!x) return; moTin("Tin hẹn nhận đồ",`Chào ${x.ten}, CHÉRIE Seconde đã nhận đăng ký ký gửi ${[x.brand,x.loai].filter(Boolean).join(" ")} của bạn.\nBạn mang đồ đến tiệm, hoặc tiệm nhận tận nơi cùng tuyến giao thứ 2 và thứ 6 ở Đà Nẵng. Nhớ mang theo hóa đơn, tag hoặc ảnh đơn hàng để tiệm kiểm nguồn gốc.\nPhí ký gửi: 30% món dưới 500.000đ, 25% món 500.000đ–10 triệu, 20% món trên 10 triệu. Tiền về trong 3 ngày làm việc sau khi hết hạn đổi trả.\nBạn hẹn giúp tiệm ngày giờ tiện nhé!`); }
 function tinHetHan(id){ const m=S.mon.find(y=>y.id===id); if(!m) return; const t=homNay(), n=soNgay(m.ngayDang,t), g=giaNay(m,t), de=Math.max(tron(g*.85),Number(m.giaSan)||0);
   moTin("Tin gửi chủ đồ",`Chào ${m.chuTen||"bạn"}, CHÉRIE Seconde báo về món ${m.ten}: đã lên kệ ${n} ngày, giá hiện tại ${vnd(g)}${n>=HAN_NGAY?", đã hết hạn ký gửi 60 ngày":", còn "+(HAN_NGAY-n)+" ngày nữa hết hạn ký gửi"}.\nBạn chọn giúp tiệm:\n1. Giảm tiếp về ${vnd(de)} và gia hạn 30 ngày\n2. Nhận lại đồ (tiệm giao cùng tuyến thứ 2, thứ 6)\nTiệm chờ phản hồi của bạn nhé!`); }
@@ -518,12 +692,18 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   if(el.tagName==="INPUT"&&a!=="chon") return;
   /* cửa hàng */
   if(a==="dong") return closeSheet();
-  if(a==="cat"){ S.shop.cat=v||"all"; if(v!==""&&hienTai()==="cua-hang"){ e.preventDefault(); veLai(); } return; }
-  if(a==="sf"){ S.shop[el.dataset.k]=v; veSP(); return; }
-  if(a==="xem") return xemSP(id);
+  if(a==="loc"){ e.preventDefault(); closeSheet(); const k=el.dataset.k; datLoc(k==="reset"?{}:{[k]:v}); return; }
+  if(a==="boLoc"){ const k=el.dataset.k; S.shop[k]=LOC0[k]; if(k==="q"){ const q=document.getElementById("sq"); if(q) q.value=""; } veMua(); return; }
+  if(a==="locGiam"){ S.shop.giam=S.shop.giam?"":"1"; veMua(); return; }
+  if(a==="menuDM") return moMenuDM();
+  if(a==="goSell"){ e.preventDefault(); S.ban=Object.assign(S.ban||{},v?{cach:v}:{},el.dataset.dm?{dm:el.dataset.dm}:{}); const m=document.getElementById("smain"); if(m) m.dataset.p=""; if(location.hash==="#ban") veLai(); else location.hash="ban"; window.scrollTo({top:0}); return; }
+  if(a==="bHang"){ S.ban.hang=v; el.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b===el)); veOffer(); return; }
+  if(a==="bCach"){ S.ban.cach=v; veOffer(); return; }
+  if(a==="anhSP") return doiAnhSP(v);
+  if(a==="thich"){ e.preventDefault(); THICH.has(id)?THICH.delete(id):THICH.add(id); luuThich(); document.querySelectorAll(`.heart[data-id="${CSS.escape(id)}"]`).forEach(b=>b.setAttribute("aria-pressed",THICH.has(id))); toast(THICH.has(id)?"Đã lưu vào Yêu thích.":"Đã bỏ khỏi Yêu thích."); if(trangShop()==="yeu-thich") veThich(); renderShopDem(); return; }
   if(a==="gio") return moGio();
-  if(a==="them"||a==="muangay"){ if(!S.cart.includes(id)){ S.cart.push(id); luuGio(); } if(a==="muangay"){ moGio(); } else { toast("Đã thêm vào giỏ."); if(sheetOpen()) xemSP(id); } veSP(); document.getElementById("cartN").textContent=gioHop().length; return; }
-  if(a==="bo"){ S.cart=S.cart.filter(x=>x!==id); luuGio(); veGio(); veSP(); return; }
+  if(a==="them"||a==="muangay"){ if(!S.cart.includes(id)){ S.cart.push(id); luuGio(); } if(a==="muangay") moGio(); else toast("Đã thêm vào giỏ."); const m=document.getElementById("smain"); if(m) m.dataset.p=""; veLai(); return; }
+  if(a==="bo"){ S.cart=S.cart.filter(x=>x!==id); luuGio(); veGio(); const m=document.getElementById("smain"); if(m&&m.dataset.p.startsWith("sp")) m.dataset.p=""; veLai(); return; }
   if(a==="tra"){ const so=sdt(val("traSdt")), ma=val("traMa").trim(); if(so.length<9||!ma){ toast("Nhập số Zalo và mã."); return; } el.disabled=true; try{ S.tra=await SC.call("traCuu",{sdt:so,ma}); S.traSo=so; traCuu(); }catch(x){ toast(x.message||"Chưa tra được, thử lại."); } el.disabled=false; return; }
   /* quản trị: điều hướng, không ghi */
   if(a==="mo"){ e.preventDefault(); document.getElementById("aqRes")&&(document.getElementById("aqRes").hidden=true); return moMon(id); }
@@ -541,7 +721,7 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   /* trình nhận đồ */
   if(a==="wNguon"){ luuBuoc(); S.W.d.nguon=v; veWizard(); return; }
   if(a==="wHang"){ luuBuoc(); S.W.d.hang=v; veWizard(); return; }
-  if(a==="wTiep"){ luuBuoc(); const d=S.W.d; if(S.W.buoc===1&&d.nguon!=="cherie"&&sdt(d.chuDo).length<9){ toast("Nhập số Zalo chủ đồ."); return; } if(S.W.buoc===2&&!d.ten){ toast("Nhập tên món."); return; } S.W.buoc++; veWizard(); window.scrollTo({top:0}); return; }
+  if(a==="wTiep"){ luuBuoc(); const d=S.W.d; if(S.W.buoc===1&&laKG(d)&&sdt(d.chuDo).length<9){ toast("Nhập số Zalo chủ đồ."); return; } if(S.W.buoc===2&&!d.ten){ toast("Nhập tên món."); return; } S.W.buoc++; veWizard(); window.scrollTo({top:0}); return; }
   if(a==="wLui"){ luuBuoc(); S.W.buoc--; veWizard(); window.scrollTo({top:0}); return; }
   if(a==="wBoAnh"){ S.W.d.anh.splice(Number(v),1); S.W.files.splice(Number(v),1); veThumbs(); return; }
   if(a==="wDungGY"){ document.getElementById("wGia").value=v; document.getElementById("wGia").oninput(); return; }
@@ -559,7 +739,8 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   if(a==="traDo") return xacNhan(`Trả "${esc(m.ten)}" cho ${esc(m.chuTen||m.chuDo)}?`,"Đã trả đồ",()=>S.db.doc("mon/"+m.id).update({tt:"tra",ngayTra:homNay(),lichSu:lichSu(m,"Trả lại chủ đồ")}));
   if(a==="xoa") return xacNhan(`Xoá "${esc(m.ten)}" khỏi kho?`,"Xoá",()=>S.db.doc("mon/"+id).delete());
   if(a==="tuChoi") return xacNhan("Từ chối đăng ký này? Nhớ nhắn Zalo báo lý do cho khách.","Từ chối",()=>S.db.doc("dangky/"+id).update({tt:"tuchoi"}));
-  if(a==="nhanDK"){ const d=S.dangky.find(x=>x.id===id); wizMoi({nguon:d.hinh==="thue"?"kyguithue":"kygui",hang:"A",ten:[d.brand,d.loai].filter(Boolean).join(" "),brand:d.brand,loai:d.loai,giaNiemYet:d.giaMua,giaDang:d.giaMuon,giaSan:d.giaSan,chuDo:d.sdt,chuTen:d.ten,bangChung:d.bangChung,moTa:"",ghiChuKhach:d.moTa,dangkyId:d.id}); closeSheet(); location.hash==="#qt-nhan"?(lastShell="",render()):location.hash="qt-nhan"; return; }
+  if(a==="offer") return moOffer(id);
+  if(a==="nhanDK"){ const d=S.dangky.find(x=>x.id===id); const ml=d.hinh==="bandut"||d.hinh==="tindung"; wizMoi({nguon:ml?"mualai":(d.hinh==="thue"?"kyguithue":"kygui"),hang:d.hangKhach||"A",danhMuc:d.danhMuc||"",phanKhuc:d.phanKhuc||"",giaVon:ml?d.offer||0:0,ten:[d.brand,d.loai].filter(Boolean).join(" "),brand:d.brand,loai:d.loai,giaNiemYet:d.giaMua,giaDang:d.giaMuon,giaSan:d.giaSan,chuDo:ml?"":d.sdt,chuTen:ml?"":d.ten,bangChung:d.bangChung,moTa:"",ghiChuKhach:ml?(d.ten+" "+d.sdt+(d.hinh==="tindung"?" · tín dụng":" · tiền mặt")):d.moTa,dangkyId:d.id}); closeSheet(); location.hash==="#qt-nhan"?(lastShell="",render()):location.hash="qt-nhan"; return; }
   if(a==="daTra"){ const col=el.dataset.k==="don"?"don":"thue"; try{ await S.db.doc(col+"/"+id).update({daTra:true,ngayTraTien:homNay()}); toast("Đã ghi chuyển tiền."); const so=(S.don.concat(S.thue).find(x=>x.id===id)||{}).chuDo; if(so&&sheetOpen()) setTimeout(()=>moChu(so),300); }catch(x){ loiGhi(x); } return; }
   if(a==="traHet") return xacNhan("Ghi đã chuyển tất cả khoản chờ trả cho chủ đồ này?","Đã chuyển tất cả",async()=>{ for(const r of noChuDo().filter(x=>x.chu===v)) await S.db.doc((r.k==="don"?"don/":"thue/")+r.id).update({daTra:true,ngayTraTien:homNay()}); toast("Đã ghi chuyển tiền."); });
   if(a==="bulkDang"){ const ds=[...S.kho.chon].map(i=>S.mon.find(x=>x.id===i)).filter(x=>x&&x.tt==="cho"&&x.giaDang&&(x.anh||[]).length&&x.nguon!=="kyguithue"); const bo=S.kho.chon.size-ds.length;

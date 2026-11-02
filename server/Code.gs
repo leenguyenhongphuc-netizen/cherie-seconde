@@ -15,7 +15,7 @@ var TAB = { mon: "Mon", dathang: "DatHang", don: "DonBan", dangky: "DangKy", thu
 var PREFIX = { mon: "M", dathang: "DH", don: "DB", dangky: "DK", thue: "LT" };
 var JSON_F = ["tinhTrang", "anh", "lichSu", "items"];
 var BOOL_F = ["daTra", "live", "vidu"];
-var NUM_F = ["soLuot", "giaNiemYet", "giaSale", "giaDang", "giaSan", "gia", "tiemHuong", "phiSan", "tienChuDo", "tienThueDaTra", "giaMua", "giaMuon", "tien", "chiaChuDo", "tong"];
+var NUM_F = ["soLuot", "giaNiemYet", "giaSale", "giaDang", "giaSan", "gia", "tiemHuong", "phiSan", "tienChuDo", "tienThueDaTra", "giaMua", "giaMuon", "tien", "chiaChuDo", "tong", "uocTinh", "offer", "giaVon"];
 var TT_MON = ["cho", "dang", "giu", "ban", "thue", "tra"];
 
 /* quy tắc giá: khớp app (app.js) */
@@ -234,7 +234,8 @@ function upAnh(me, q) {
 }
 
 /* ---------- công khai: kệ hàng, đặt giữ, đăng ký ký gửi, tra cứu ---------- */
-var AN = ["chuDo", "chuTen", "giaSan", "hhRieng", "bangChung", "ghiChuKhach", "lichSu", "maGoc", "vidu", "live", "capNhat", "ngayNhan"];
+var AN = ["chuDo", "chuTen", "giaSan", "hhRieng", "bangChung", "ghiChuKhach", "lichSu", "maGoc", "vidu", "live", "capNhat", "ngayNhan", "giaVon"];
+var HINH = ["ban", "thue", "bandut", "tindung"], DM = ["dam", "congso", "ao", "tui", "giay", "phukien"], PKS = ["tamtrung", "caocap", "luxury"];
 function rate(key, max, sec) {
   var c = CacheService.getScriptCache(), n = +(c.get(key) || 0), n0 = +(c.get("web_all") || 0);
   if (n >= max) fail("Bạn gửi hơi nhiều lần. Nhắn Zalo " + ZALO + " giúp tiệm nhé.", "rate");
@@ -280,7 +281,8 @@ function dangKy(q) {
   return withLock(function () {
     var t = tab("DangKy");
     var row = { id: nextMa(t.rows, "DK-" + now("ddMM") + "-"), ten: ten, sdt: sdt, brand: txt(q.brand, 60), loai: txt(q.loai, 60), giaMua: num(q.giaMua), giaMuon: num(q.giaMuon), giaSan: num(q.giaSan),
-      hinh: q.hinh === "thue" ? "thue" : "ban", bangChung: txt(q.bangChung, 60), moTa: txt(q.moTa, 1000), ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
+      hinh: pick(q.hinh, HINH, "ban"), danhMuc: pick(q.danhMuc, DM, ""), phanKhuc: pick(q.phanKhuc, PKS, ""), hangKhach: pick(q.hangKhach, ["A", "B", "C"], ""), uocTinh: num(q.uocTinh),
+      bangChung: txt(q.bangChung, 60), moTa: txt(q.moTa, 1000), ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
     appendObj(t, row);
     log(null, "Đăng ký ký gửi", row.id, row.brand + " " + row.loai);
     return { ok: true, id: row.id };
