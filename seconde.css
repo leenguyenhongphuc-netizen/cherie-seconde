@@ -444,3 +444,38 @@ tr:last-child td{border-bottom:0}
 .kywrap{position:relative;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:#fff}
 .kywrap canvas{display:block;width:100%;height:auto;aspect-ratio:10/3;touch-action:none;cursor:crosshair}
 .kywrap .btn{position:absolute;right:8px;top:8px}
+
+/* ---- Bán 4 bước (v3, 02/11) ---- */
+.stepper{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stepper li b{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.stepper li.xong b{color:var(--ink)}
+div.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);min-width:0}
+div.f > b{color:var(--ink)}
+.segs{display:flex;flex-wrap:wrap;gap:6px}
+.segs .chip,.bopts .chip{font-weight:500}
+.bopts{display:flex;flex-wrap:wrap;gap:6px;max-height:132px;overflow-y:auto;padding:2px;align-items:center}
+.bopts .chip.khac{border-style:dashed}
+.aitag{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:var(--wine);background:var(--wine-soft);border-radius:999px;padding:2px 7px;margin-left:4px;vertical-align:1px;white-space:nowrap}
+.aicard{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.aihead{display:flex;gap:10px;align-items:center}
+.aihead b{font-size:16px;color:var(--ink)}
+.aibadge{flex:none;width:34px;height:34px;border-radius:999px;background:var(--wine);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:12px}
+.aimore summary{cursor:pointer;font-size:13.5px;font-weight:600;padding:4px 0}
+.aimore ul{margin:4px 0 6px;padding-left:18px;font-size:13px}
+.thieu{margin:0;text-align:right;min-height:1em}
+.thumbs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.thumbs .ph{aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--soft)}
+.thumbs .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs .so{position:absolute;left:4px;top:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:999px;font-size:11px;font-weight:700;min-width:20px;height:20px;display:grid;place-items:center}
+.drop.tile{aspect-ratio:1;padding:8px;justify-content:center;font-size:12.5px}
+.drop.tile b{color:var(--ink);font-size:13px;line-height:1.2}
+.shots{counter-reset:s}
+.qq{grid-template-columns:1fr 1fr}
+.filecta{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.filecta input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.filecta .ico{width:18px;height:18px}
+.btn.ghostlight{background:transparent;color:var(--bg);border:1px solid color-mix(in srgb,var(--bg) 45%,transparent);text-align:center}
+@media (max-width:520px){.qq{grid-template-columns:1fr}}
+.fl{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.fl .aitag{margin-left:2px}
+.brsel{color:var(--ink);font-weight:700;margin-left:4px}

@@ -343,26 +343,66 @@ function upAnhKH(q) {
 function cuaPhien(p, ids, loai) {
   var ds = idsPhien(p); return (ids || []).filter(function (id) { return ds.some(function (x) { return x.id === id && (!loai || x.loai === loai); }); });
 }
+/* AI nhận diện và đánh giá sơ bộ từ ảnh.
+   - Chỉ đọc tối đa AI_MAX_ANH ảnh đầu (tiết kiệm token: mỗi ảnh ~1.300–1.600 token).
+   - Cùng bộ ảnh thì trả kết quả đã lưu, không gọi AI lần nữa.
+   - Ép AI trả về đúng mẫu qua công cụ "ket_qua" (không phải đoán JSON trong chữ).
+   - Giới hạn: 4 lần / phiên / 6 giờ; AI_MOI_NGAY lần / ngày cho cả web [GĐ]. */
+var AI_MAX_ANH = 4, AI_MOI_NGAY = 150;
+var AI_DM = ["dam", "congso", "ao", "tui", "giay", "phukien"];
+var AI_SCHEMA = { type: "object", properties: {
+  danhMuc: { type: "string", enum: AI_DM, description: "dam=đầm dự tiệc, congso=đồ công sở, ao=áo/chân váy, tui=túi/ví, giay=giày, phukien=phụ kiện" },
+  brand: { type: "string", description: "Tên thương hiệu chính thức (ví dụ Saint Laurent, Louis Vuitton), rỗng nếu không thấy" },
+  brandChac: { type: "string", enum: ["chac", "doan", "khong"], description: "chac = thấy rõ logo/tem; doan = đoán theo kiểu dáng; khong = không nhận ra" },
+  model: { type: "string", description: "Tên mẫu nếu nhận ra, ví dụ Le 5 à 7 Hobo" },
+  mau: { type: "string" }, chatLieu: { type: "string" }, size: { type: "string", description: "Kích cỡ nếu thấy" },
+  namSanXuat: { type: "string", description: "Khoảng năm, ví dụ 2019–2021; rỗng nếu không đủ căn cứ" },
+  canCuNam: { type: "string" },
+  giaMoiUoc: { type: "integer", description: "Giá bán mới chính hãng hiện tại tại Việt Nam, đồng; 0 nếu không chắc" },
+  hang: { type: "string", enum: ["A", "B", "C"], description: "A như mới, không lỗi thấy được; B đã dùng còn đẹp; C có lỗi thấy được" },
+  doMoi: { type: "integer", description: "0-100" },
+  ruiRo: { type: "string", enum: ["thap", "trungbinh", "cao", "khongro"] },
+  lyDo: { type: "array", items: { type: "string" }, description: "Tối đa 4 ý ngắn về độ tin cậy nguồn gốc dựa trên chi tiết thấy được" },
+  loi: { type: "array", items: { type: "string" }, description: "Hao mòn, lỗi thấy được, tối đa 5 ý ngắn" },
+  moTa: { type: "string", description: "2 câu mô tả trung thực cho người mua" },
+  canThemAnh: { type: "array", items: { type: "string" }, description: "Tối đa 3 ảnh nên chụp thêm" }
+}, required: ["danhMuc", "brand", "brandChac", "hang", "doMoi", "ruiRo", "lyDo", "loi", "moTa", "canThemAnh", "giaMoiUoc"] };
 function aiDanhGia(q) {
-  var p = phienOk(q.phien), key = props().getProperty("AI_KEY");
+  var p = phienOk(q.phien), key = props().getProperty("AI_KEY"), c = CacheService.getScriptCache();
   if (!key) return { ok: true, khongCo: true };
+  var ids = cuaPhien(p, q.ids, "sp").slice(0, AI_MAX_ANH); if (ids.length < 1) fail("Chưa có ảnh hợp lệ, gửi lại ảnh", "bad_request");
+  var khoa = "aiK_" + sha256(p + "|" + ids.join(",")).slice(0, 32), cu = c.get(khoa);
+  if (cu) return { ok: true, ai: JSON.parse(cu), cu: true };
   rate("ai_" + p, 4, 21600);
-  var ids = cuaPhien(p, q.ids, "sp").slice(0, 6); if (ids.length < 1) fail("Chưa có ảnh hợp lệ, gửi lại ảnh", "bad_request");
+  var nk = "ai_ngay_" + now("yyyyMMdd"), n = +(c.get(nk) || 0);
+  if (n >= AI_MOI_NGAY) fail("AI đã hết lượt hôm nay. Bạn điền thông tin, tiệm xem ảnh và báo lại.", "rate");
+  c.put(nk, String(n + 1), 90000);
+  var goiY = [txt(q.brand, 60) ? "thương hiệu \"" + txt(q.brand, 60) + "\"" : "", txt(q.danhMuc, 40) ? "danh mục \"" + txt(q.danhMuc, 40) + "\"" : ""].filter(String).join(", ");
   var content = ids.map(function (id) { return { type: "image", source: { type: "base64", media_type: "image/jpeg", data: Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()) } }; });
-  content.push({ type: "text", text: "Bạn là chuyên viên thẩm định đồ hiệu secondhand của tiệm CHÉRIE Seconde tại Việt Nam. Khách khai: thương hiệu \"" + txt(q.brand, 60) + "\", danh mục \"" + txt(q.danhMuc, 40) + "\", giá mua " + num(q.giaMua) + " đồng. " +
-    "Hãy xem các ảnh và trả lời CHỈ bằng một đối tượng JSON, tiếng Việt, không thêm chữ nào khác:\n" +
-    '{"hang":"A"|"B"|"C","doMoi":số 0-100,"namSanXuat":"khoảng năm, ví dụ 2019–2021, hoặc rỗng nếu không đủ căn cứ","canCuNam":"căn cứ ngắn (mã sản xuất, kiểu mẫu…) hoặc rỗng","ruiRo":"thap"|"trungbinh"|"cao"|"khongro","lyDo":["tối đa 4 lý do ngắn về độ tin cậy nguồn gốc, dựa trên chi tiết thấy được: logo, font, đường may, kim loại, tem, mã"],"loi":["hao mòn, lỗi thấy được"],"model":"tên mẫu nếu nhận ra","mau":"màu chính","size":"kích cỡ nếu thấy","moTa":"2 câu mô tả trung thực cho người mua","canThemAnh":["ảnh nên chụp thêm để kiểm tra"]}\n' +
-    "Quy ước hạng: A như mới, không lỗi thấy được; B đã dùng, còn đẹp; C có lỗi thấy được. Không khẳng định chắc chắn hàng thật hay giả: đây chỉ là nhận định sơ bộ từ ảnh. Nếu ảnh không đủ để nhận định nguồn gốc, dùng \"khongro\" và liệt kê ảnh cần thêm. Không bịa chi tiết không thấy trong ảnh." });
-  var res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", { method: "post", contentType: "application/json", muteHttpExceptions: true,
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
-    payload: JSON.stringify({ model: props().getProperty("AI_MODEL") || "claude-sonnet-5-5", max_tokens: 1200, messages: [{ role: "user", content: content }] }) });
-  if (res.getResponseCode() !== 200) { log(null, "AI lỗi", p, res.getResponseCode() + " " + res.getContentText().slice(0, 200)); fail("AI đang bận, thử lại sau ít phút", "ai"); }
-  var t = (JSON.parse(res.getContentText()).content || []).map(function (c) { return c.text || ""; }).join("");
-  var m = t.match(/\{[\s\S]*\}/); if (!m) fail("AI chưa trả kết quả rõ, thử lại", "ai");
-  var a = JSON.parse(m[0]), s = function (v, n) { return txt(v, n || 120); }, arr = function (v) { return (Array.isArray(v) ? v : []).slice(0, 5).map(function (x) { return s(x, 160); }); };
-  var out = { hang: pick(a.hang, ["A", "B", "C"], ""), doMoi: Math.max(0, Math.min(100, Math.round(+a.doMoi || 0))), namSanXuat: s(a.namSanXuat, 40), canCuNam: s(a.canCuNam, 160),
-    ruiRo: pick(a.ruiRo, ["thap", "trungbinh", "cao", "khongro"], "khongro"), lyDo: arr(a.lyDo), loi: arr(a.loi), model: s(a.model, 80), mau: s(a.mau, 40), size: s(a.size, 30), moTa: s(a.moTa, 400), canThemAnh: arr(a.canThemAnh) };
-  CacheService.getScriptCache().put("ai_" + p, JSON.stringify(out), 21600);
+  content.push({ type: "text", text: "Bạn là chuyên viên thẩm định đồ hiệu secondhand của tiệm CHÉRIE Seconde tại Việt Nam. " +
+    "Xem " + ids.length + " ảnh của MỘT món đồ khách muốn bán" + (goiY ? " (khách gợi ý: " + goiY + ")" : "") + ". " +
+    "Nhận diện danh mục, thương hiệu, mẫu, màu, chất liệu, size, năm sản xuất, ước giá mới chính hãng, tình trạng và rủi ro nguồn gốc, rồi gọi công cụ ket_qua. " +
+    "Viết tiếng Việt, ngắn gọn. Chỉ dựa vào chi tiết THẤY trong ảnh, không bịa. Không khẳng định chắc chắn hàng thật hay giả: đây là nhận định sơ bộ. " +
+    "Không thấy logo hoặc tem thì brandChac = \"doan\" hoặc \"khong\" và ruiRo = \"khongro\"." });
+  var res;
+  try {
+    res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", { method: "post", contentType: "application/json", muteHttpExceptions: true,
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+      payload: JSON.stringify({ model: props().getProperty("AI_MODEL") || "claude-sonnet-5-5", max_tokens: 2000,
+        tools: [{ name: "ket_qua", description: "Ghi kết quả đánh giá món đồ", input_schema: AI_SCHEMA }], tool_choice: { type: "tool", name: "ket_qua" },
+        messages: [{ role: "user", content: content }] }) });
+  } catch (e) { log(null, "AI lỗi mạng", p, String(e).slice(0, 200)); fail("AI phản hồi chậm, bấm Thử lại", "ai"); }
+  var code = res.getResponseCode(), body = res.getContentText();
+  if (code !== 200) { log(null, "AI lỗi", p, code + " " + body.slice(0, 250)); fail(code === 401 ? "Khóa AI chưa đúng, tiệm sẽ kiểm tra" : code === 429 || code === 529 ? "AI đang bận, thử lại sau ít phút" : "AI chưa đánh giá được, thử lại", "ai"); }
+  var j = JSON.parse(body), tu = (j.content || []).filter(function (x) { return x.type === "tool_use"; })[0];
+  if (!tu || !tu.input) { log(null, "AI không trả mẫu", p, (j.stop_reason || "") + " " + body.slice(0, 250)); fail("AI chưa trả kết quả rõ, thử lại", "ai"); }
+  var a = tu.input, s = function (v, n) { return txt(v, n || 120); }, arr = function (v, k) { return (Array.isArray(v) ? v : []).slice(0, k || 5).map(function (x) { return s(x, 160); }); };
+  var out = { danhMuc: pick(a.danhMuc, AI_DM, ""), brand: s(a.brand, 60), brandChac: pick(a.brandChac, ["chac", "doan", "khong"], "khong"), model: s(a.model, 80), mau: s(a.mau, 40), chatLieu: s(a.chatLieu, 60), size: s(a.size, 30),
+    namSanXuat: s(a.namSanXuat, 40), canCuNam: s(a.canCuNam, 160), giaMoiUoc: Math.max(0, Math.min(5000000000, Math.round(+a.giaMoiUoc || 0))),
+    hang: pick(a.hang, ["A", "B", "C"], ""), doMoi: Math.max(0, Math.min(100, Math.round(+a.doMoi || 0))),
+    ruiRo: pick(a.ruiRo, ["thap", "trungbinh", "cao", "khongro"], "khongro"), lyDo: arr(a.lyDo, 4), loi: arr(a.loi, 5), moTa: s(a.moTa, 400), canThemAnh: arr(a.canThemAnh, 3), soAnh: ids.length };
+  c.put(khoa, JSON.stringify(out), 21600); c.put("ai_" + p + "_kq", JSON.stringify(out), 21600);
+  log(null, "AI đánh giá", p.slice(-6), out.brand + " · " + out.danhMuc + " · " + out.hang + " · " + (j.usage ? j.usage.input_tokens + "+" + j.usage.output_tokens + " token" : ""));
   return { ok: true, ai: out };
 }
 function sha256(t) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8).map(function (b) { return ("0" + (b & 255).toString(16)).slice(-2); }).join(""); }
@@ -383,7 +423,7 @@ function kyHopDong(q) {
   var gio = now("yyyy-MM-dd HH:mm:ss"), hash = sha256(vb + "\n" + gio + "\n" + cccd);
   var kyId = folderRieng("ky").createFile(Utilities.newBlob(Utilities.base64Decode(ky.split(",")[1]), "image/png", "chuky-" + now("yyyyMMdd-HHmmss") + "-" + sdt.slice(-4) + ".png")).getId();
   var vbId = folderRieng("vb").createFile(Utilities.newBlob(vb + "\n\n---\nKý lúc " + gio + " (giờ máy chủ, UTC+7) · SHA-256 " + hash + " · Phiên bản " + txt(q.phienBan, 20) + " · Thiết bị " + txt(q.ua, 200), "text/plain", "hopdong-" + now("yyyyMMdd-HHmmss") + "-" + sdt.slice(-4) + ".txt")).getId();
-  var aiC = CacheService.getScriptCache().get("ai_" + p);
+  var aiC = CacheService.getScriptCache().get("ai_" + p + "_kq");
   return withLock(function () {
     var t = tab("DangKy"), hd = tabCo("HopDong", HD_HEAD);
     var id = nextMa(t.rows, "DK-" + now("ddMM") + "-"), maHD = nextMa(hd.rows, "HD-" + now("ddMM") + "-");
