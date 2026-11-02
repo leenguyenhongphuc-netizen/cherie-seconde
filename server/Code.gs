@@ -66,6 +66,8 @@ function handle(q) {
     case "xemHD": return xemHD(q);
     case "kyHD": return kyHD(q);
     case "theoDoi": return theoDoiKH(q);
+    case "phanHoiGia": return phanHoiGia(q);
+    case "guiVanDon": return guiVanDon(q);
     case "taoHD": return taoHD(auth(q.token), q);
     case "themKhau": return themKhau(auth(q.token), q);
     case "anhRieng": return anhRieng(auth(q.token), q);
@@ -520,8 +522,11 @@ function hoSoDK(me, q) {
    4. Mỗi khâu sau đó (nhận đồ, kiểm định, vệ sinh, chụp ảnh, gắn tag, lên kệ, bán, trả tiền) ghi kèm ảnh (themKhau).
    5. Khách theo dõi bằng link riêng (theoDoiKH).
    ===================================================================== */
-var KHAU = ["guiDK", "taoHD", "kyHD", "nhanDo", "kiemDinh", "veSinh", "chupAnh", "ganTag", "lenKe", "daBan", "traTien", "traDo", "ghiChu"];
-var KHAU_TT = { nhanDo: "danhan", kiemDinh: "danhan", veSinh: "danhan", chupAnh: "danhan", ganTag: "danhan", lenKe: "lenke", daBan: "daban", traTien: "xong", traDo: "xong" };
+/* Thứ tự (02/11 17:55, chị Phúc): gửi yêu cầu → tiệm báo giá → khách đồng ý / thương lượng → (tỉnh khác: khách gửi đồ, nhập mã vận đơn) → tiệm nhận đồ → kiểm định, chốt giá → hợp đồng → ký → vệ sinh, chụp ảnh, gắn tag, lên kệ, bán, chuyển tiền. */
+var KHAU = ["guiDK", "baoGia", "thuongLuong", "dongY", "guiDo", "nhanDo", "kiemDinh", "taoHD", "kyHD", "veSinh", "chupAnh", "ganTag", "lenKe", "daBan", "traTien", "traDo", "ghiChu"];
+var TT_HANG = ["moi", "baogia", "dongy", "danhan", "hd", "daky", "lenke", "daban", "xong"];
+var KHAU_TT = { baoGia: "baogia", thuongLuong: "baogia", dongY: "dongy", guiDo: "dongy", nhanDo: "danhan", kiemDinh: "danhan", taoHD: "hd", kyHD: "daky", lenKe: "lenke", daBan: "daban", traTien: "xong", traDo: "xong" };
+function ttSau_(cur, b) { var m = KHAU_TT[b]; if (!m) return cur; if (b === "traDo") return "xong"; var a = TT_HANG.indexOf(cur), c = TT_HANG.indexOf(m); return a < 0 && cur !== "moi" ? (cur === "khongdat" ? cur : m) : (c > a ? m : cur); }
 function maNgauNhien_(n) { var s = ""; while (s.length < n) s += Utilities.getUuid().replace(/-/g, ""); return s.slice(0, n).toLowerCase(); }
 function damBaoCot_(name, cols) {
   var sh = ss().getSheetByName(name); if (!sh) return;
@@ -549,7 +554,7 @@ function guiDinhGia(q) {
       giaMua: num(q.giaMua), giaMuon: 0, giaSan: cach === "ban" ? num(q.giaSan) : 0, uocTinh: num(q.uocTinh), hinh: cach, bangChung: txt(q.bangChung, 60), noiO: txt(q.noiO, 60),
       moTa: [txt(q.size, 30) ? "Size " + txt(q.size, 30) : "", txt(q.mau, 40), txt(q.namMua, 10) ? "Mua năm " + txt(q.namMua, 10) : "", txt(q.ghiChu, 600)].filter(String).join(" · "),
       anhKH: { sp: anh, hd: cuaPhien(p, q.hdAnh, "hd") }, ai: aiC ? JSON.parse(aiC) : null, phuKien: (Array.isArray(q.phuKien) ? q.phuKien : []).slice(0, 8).map(function (x) { return txt(x, 40); }),
-      theoDoi: td, nhatTrinh: [khau_("guiDK", { ghiChu: "Giá ước tính trên web " + soDep_(num(q.uocTinh)) + "đ" })], ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
+      giaMuon: num(q.giaMuon), theoDoi: td, nhatTrinh: [khau_("guiDK", { ghiChu: "Giá ước tính trên web " + soDep_(num(q.uocTinh)) + "đ" + (num(q.giaMuon) ? " · bạn mong muốn " + soDep_(num(q.giaMuon)) + "đ" : "") })], ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
     appendObj(t, dk);
     log(null, "Yêu cầu định giá", id, dk.brand + " · " + cach);
     return { ok: true, id: id, theoDoi: td };
@@ -572,7 +577,7 @@ function taoHD(me, q) {
     else { var row = { id: maHD, dangkyId: id, hinh: cach, sdt: x.sdt, hoTen: x.ten, trangThai: "Chờ ký", token: tok, dieuKhoan: JSON.stringify(dieu), taoLuc: now(), taoBoi: me.ten };
       hd.sh.appendRow(hd.head.map(function (k) { return row[k] == null ? "" : cell(row[k]); })); }
     var nt = (x.nhatTrinh || []).concat([khau_("taoHD", { nv: me.ten, ghiChu: "Giá chốt " + soDep_(giaChot) + "đ" })]);
-    writeObj(t, r._r, { maHD: maHD, hdToken: tok, giaChot: giaChot, offer: giaChot, hinh: cach, tt: "hd", nhatTrinh: nt, capNhat: now() });
+    writeObj(t, r._r, { maHD: maHD, hdToken: tok, giaChot: giaChot, offer: giaChot, hinh: cach, tt: ttSau_(x.tt, "taoHD"), nhatTrinh: nt, capNhat: now() });
     log(me, "Tạo link hợp đồng", maHD, id + " · " + cach + " · " + giaChot);
     return { ok: true, maHD: maHD, token: tok, theoDoi: x.theoDoi || "", doc: toDoc(find(tab("DangKy"), "id", id)) };
   });
@@ -617,15 +622,17 @@ function kyHD(q) {
 }
 /* 4. Nhân viên ghi một khâu (kèm ảnh, ghi chú, số tiền, mã món) */
 function themKhau(me, q) {
-  var id = txt(q.id, 30), b = pick(q.b, KHAU, ""); if (!b || ["guiDK", "taoHD", "kyHD"].indexOf(b) > -1) fail("Chọn khâu", "bad_request");
+  var id = txt(q.id, 30), b = pick(q.b, KHAU, ""); if (!b || ["guiDK", "taoHD", "kyHD", "thuongLuong"].indexOf(b) > -1) fail("Chọn khâu", "bad_request");
   dkCot_();
   return withLock(function () {
     var t = tab("DangKy"), r = find(t, "id", id); if (!r) fail("Không tìm thấy " + id, "not_found");
     var x = toDoc(r), e = khau_(b, { nv: me.ten, ghiChu: txt(q.ghiChu, 400), anh: (Array.isArray(q.anh) ? q.anh : []).slice(0, 8).map(function (a) { return txt(a, 80); }), so: num(q.so), ma: txt(q.ma, 30), dat: q.dat === false ? "khong" : "" });
     if (!e.anh.length) delete e.anh;
     var w = { nhatTrinh: (x.nhatTrinh || []).concat([e]).slice(-60), capNhat: now() };
-    if (KHAU_TT[b]) w.tt = KHAU_TT[b];
+    w.tt = ttSau_(x.tt, b);
     if (b === "kiemDinh" && q.dat === false) w.tt = "khongdat";
+    if (b === "baoGia" && e.so) w.offer = e.so;
+    if (b === "kiemDinh" && e.so) w.giaChot = e.so;
     writeObj(t, r._r, w);
     log(me, "Khâu " + b, id, txt(q.ghiChu, 120));
     var nx = toDoc(find(tab("DangKy"), "id", id));
@@ -639,5 +646,34 @@ function theoDoiKH(q) {
   var r = find(tab("DangKy"), "theoDoi", tok); if (!r) fail("Link theo dõi không đúng", "not_found");
   var x = toDoc(r), hdLink = "";
   if (x.tt === "hd") { try { var h = tab("HopDong").rows.filter(function (y) { return y.dangkyId === x.id && y.trangThai === "Chờ ký"; })[0]; if (h) hdLink = h.token; } catch (e) {} }
-  return { ok: true, dk: { id: x.id, ten: x.ten, brand: x.brand, loai: x.loai, danhMuc: x.danhMuc, hinh: x.hinh, uocTinh: x.uocTinh, giaChot: x.giaChot, maHD: x.maHD, tt: x.tt, ngay: x.ngay, nhatTrinh: x.nhatTrinh || [] }, hdToken: hdLink };
+  return { ok: true, dk: { id: x.id, ten: x.ten, brand: x.brand, loai: x.loai, danhMuc: x.danhMuc, hinh: x.hinh, uocTinh: x.uocTinh, giaChot: x.giaChot, offer: x.offer, giaMuon: x.giaMuon, noiO: x.noiO, maHD: x.maHD, tt: x.tt, ngay: x.ngay, nhatTrinh: x.nhatTrinh || [] }, hdToken: hdLink };
+}
+/* Khách trả lời báo giá trên trang theo dõi: đồng ý, hoặc đề nghị giá khác (thương lượng) */
+function phanHoiGia(q) {
+  var tok = txt(q.token, 40); if (!/^[a-z0-9]{16,40}$/.test(tok)) fail("Link theo dõi không đúng", "not_found");
+  rate("ph_" + tok, 10, 86400);
+  return withLock(function () {
+    var t = tab("DangKy"), r = find(t, "theoDoi", tok); if (!r) fail("Link theo dõi không đúng", "not_found");
+    var x = toDoc(r), nt = x.nhatTrinh || [], bg = nt.filter(function (e) { return e.b === "baoGia"; }).slice(-1)[0];
+    if (!bg) fail("Tiệm chưa báo giá", "bad_request");
+    var e, w = { capNhat: now() };
+    if (q.dongY) { e = khau_("dongY", { so: bg.so, ghiChu: txt(q.ghiChu, 300) }); w.giaMuon = 0; }
+    else { var gm = num(q.giaMuon); if (!gm) fail("Nhập giá bạn mong muốn", "bad_request"); e = khau_("thuongLuong", { so: gm, ghiChu: txt(q.ghiChu, 300) }); w.giaMuon = gm; }
+    w.nhatTrinh = nt.concat([e]).slice(-60); w.tt = ttSau_(x.tt, e.b);
+    writeObj(t, r._r, w); log(null, q.dongY ? "Khách đồng ý giá" : "Khách thương lượng", x.id, String(e.so || ""));
+    return { ok: true };
+  });
+}
+/* Khách tỉnh khác nhập mã vận đơn sau khi gửi đồ */
+function guiVanDon(q) {
+  var tok = txt(q.token, 40); if (!/^[a-z0-9]{16,40}$/.test(tok)) fail("Link theo dõi không đúng", "not_found");
+  var ma = txt(q.ma, 40).replace(/\s/g, ""); if (ma.length < 6) fail("Nhập mã vận đơn", "bad_request");
+  rate("vd_" + tok, 6, 86400);
+  return withLock(function () {
+    var t = tab("DangKy"), r = find(t, "theoDoi", tok); if (!r) fail("Link theo dõi không đúng", "not_found");
+    var x = toDoc(r); if (!(x.nhatTrinh || []).some(function (e) { return e.b === "dongY"; })) fail("Bạn đồng ý giá trước rồi mới gửi đồ nhé", "bad_request");
+    writeObj(t, r._r, { nhatTrinh: (x.nhatTrinh || []).concat([khau_("guiDo", { ma: ma, ghiChu: txt(q.dvvc, 40) })]).slice(-60), tt: ttSau_(x.tt, "guiDo"), capNhat: now() });
+    log(null, "Khách gửi đồ", x.id, ma);
+    return { ok: true };
+  });
 }

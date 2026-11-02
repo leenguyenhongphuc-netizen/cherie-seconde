@@ -539,3 +539,20 @@ input[type="date"]::-webkit-date-and-time-value{text-align:left}
 .tplist button{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-direction:column;gap:2px;background:var(--surface)}
 .tplist button span{font-size:12.5px;color:var(--muted)}
 .linkbox{display:flex;gap:6px;align-items:center;background:var(--soft);border-radius:var(--r-sm);padding:8px 10px;font-size:13px;word-break:break-all}
+/* ---- 02/11 18:00: bước giá dễ hiểu, thương lượng, theo dõi ---- */
+.monbox{display:flex;gap:12px;align-items:center;background:var(--soft);border-radius:var(--r);padding:10px}
+.monbox img,.monbox .ph0{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;display:grid;place-items:center;background:var(--wine-soft);color:var(--wine)}
+.monbox > div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.monbox b{font-size:15px}
+.optlist{display:grid;gap:8px}
+.opt{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:var(--r);padding:12px;background:var(--surface);color:var(--ink);min-height:56px}
+.opt .dot{width:18px;height:18px;border-radius:999px;border:2px solid var(--muted)}
+.opt[aria-checked="true"]{border-color:var(--wine);background:var(--wine-soft)}
+.opt[aria-checked="true"] .dot{border-color:var(--wine);box-shadow:inset 0 0 0 4px var(--surface);background:var(--wine)}
+.opt .ot{display:flex;flex-direction:column;gap:2px;min-width:0}
+.opt .ot span{font-size:12.5px;color:var(--muted)}
+.opt .oa{font-weight:700;font-size:15px;text-align:right}
+@media (max-width:480px){.opt{grid-template-columns:20px 1fr}.opt .oa{grid-column:2;text-align:left}}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tdgia .big{font-size:20px;line-height:1.3}
+@media (max-width:820px){.banwrap .sellside{display:none}}
