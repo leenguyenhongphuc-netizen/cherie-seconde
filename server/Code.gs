@@ -61,6 +61,7 @@ function handle(q) {
     case "traCuu": return traCuu(q);
     case "upAnhKH": return upAnhKH(q);
     case "aiDanhGia": return aiDanhGia(q);
+    case "docGiayTo": return docGiayTo(q);
     case "kyHopDong": return kyHopDong(q);
     case "anhRieng": return anhRieng(auth(q.token), q);
     case "hoSoDK": return hoSoDK(auth(q.token), q);
@@ -409,6 +410,50 @@ function aiDanhGia(q) {
   log(null, "AI đánh giá", p.slice(-6), out.brand + " · " + out.danhMuc + " · " + out.hang + " · " + (j.usage ? j.usage.input_tokens + "+" + j.usage.output_tokens + " token" : ""));
   return { ok: true, ai: out };
 }
+/* Gọi Claude với ảnh + khuôn JSON (structured outputs). Trả object đã parse. */
+function goiClaude_(ids, loiNhac, schema, maxTok, nhan) {
+  var key = props().getProperty("AI_KEY");
+  var content = ids.map(function (id) { return { type: "image", source: { type: "base64", media_type: "image/jpeg", data: Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()) } }; });
+  content.push({ type: "text", text: loiNhac });
+  var res;
+  try {
+    res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", { method: "post", contentType: "application/json", muteHttpExceptions: true,
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+      payload: JSON.stringify({ model: props().getProperty("AI_MODEL") || "claude-sonnet-5-5", max_tokens: maxTok || 4000,
+        output_config: { format: { type: "json_schema", schema: schema } }, messages: [{ role: "user", content: content }] }) });
+  } catch (e) { log(null, nhan + " lỗi mạng", "", String(e).slice(0, 200)); fail("AI phản hồi chậm, bấm Thử lại", "ai"); }
+  var code = res.getResponseCode(), body = res.getContentText();
+  if (code !== 200) { log(null, nhan + " lỗi", "", code + " " + body.slice(0, 250)); fail(code === 429 || code === 529 ? "AI đang bận, thử lại sau ít phút" : "AI chưa đọc được, thử lại", "ai"); }
+  var j = JSON.parse(body), t = (j.content || []).filter(function (x) { return x.type === "text"; }).map(function (x) { return x.text; }).join(""), a = null;
+  try { a = JSON.parse(t); } catch (e) {}
+  if (!a) { log(null, nhan + " không trả mẫu", "", (j.stop_reason || "")); fail(j.stop_reason === "refusal" ? "AI không đọc được ảnh này" : "AI chưa trả kết quả rõ, thử lại", "ai"); }
+  log(null, nhan, "", j.usage ? j.usage.input_tokens + "+" + j.usage.output_tokens + " token" : "");
+  return a;
+}
+/* Đọc giấy tờ tùy thân (CCCD 2 mặt hoặc ảnh màn hình VNeID) để tự điền hợp đồng.
+   Chỉ chạy khi khách đã tích đồng ý xử lý ảnh giấy tờ. KHÔNG ghi số CCCD, họ tên vào nhật ký. Kết quả chỉ trả về trình duyệt của khách. */
+var GT_SCHEMA = { type: "object", properties: {
+  hopLe: { type: "boolean", description: "true nếu đây là thẻ CCCD/căn cước Việt Nam hoặc màn hình thẻ căn cước trong ứng dụng VNeID và đọc được rõ" },
+  cccd: { type: "string", description: "Số CCCD / số định danh cá nhân 12 chữ số, chỉ chữ số" },
+  hoTen: { type: "string", description: "Họ và tên đúng như trên giấy tờ, viết hoa chữ đầu mỗi từ, có dấu" },
+  ngaySinh: { type: "string", description: "Ngày sinh dạng yyyy-mm-dd" },
+  diaChi: { type: "string", description: "Nơi thường trú (hoặc nơi cư trú) đầy đủ như trên giấy tờ" },
+  ghiChu: { type: "string", description: "Nếu không hợp lệ: lý do ngắn bằng tiếng Việt (ảnh mờ, bị che, không phải giấy tờ…); nếu hợp lệ để rỗng" }
+}, additionalProperties: false };
+GT_SCHEMA.required = Object.keys(GT_SCHEMA.properties);
+function docGiayTo(q) {
+  var p = phienOk(q.phien);
+  if (!q.dong) fail("Cần tích ô đồng ý xử lý ảnh giấy tờ", "bad_request");
+  if (!props().getProperty("AI_KEY")) return { ok: true, khongCo: true };
+  var ids = cuaPhien(p, q.ids, "cccd").slice(0, 2); if (!ids.length) fail("Chưa có ảnh giấy tờ, chụp lại", "bad_request");
+  rate("gt_" + p, 4, 21600);
+  var c = CacheService.getScriptCache(), nk = "ai_ngay_" + now("yyyyMMdd"), n = +(c.get(nk) || 0);
+  if (n >= AI_MOI_NGAY) fail("Đọc tự động đã hết lượt hôm nay, bạn điền tay giúp tiệm.", "rate"); c.put(nk, String(n + 1), 90000);
+  var a = goiClaude_(ids, "Đây là ảnh " + (q.loai === "vneid" ? "chụp màn hình thẻ căn cước trong ứng dụng VNeID" : "hai mặt thẻ căn cước công dân / thẻ căn cước Việt Nam") +
+    " do chính chủ gửi để ký hợp đồng ký gửi với cửa hàng CHÉRIE Seconde (đã đồng ý xử lý dữ liệu). Hãy đọc chính xác các trường theo khuôn. Không đoán chữ bị che hoặc mờ: để rỗng. Nếu không phải giấy tờ tùy thân Việt Nam thì hopLe=false.", GT_SCHEMA, 2000, "Đọc giấy tờ");
+  var so = String(a.cccd || "").replace(/\D/g, ""), ns = String(a.ngaySinh || "");
+  return { ok: true, gt: { hopLe: !!a.hopLe && /^\d{12}$/.test(so), cccd: /^\d{12}$/.test(so) ? so : "", hoTen: txt(a.hoTen, 80), ngaySinh: /^\d{4}-\d{2}-\d{2}$/.test(ns) ? ns : "", diaChi: txt(a.diaChi, 200), ghiChu: txt(a.ghiChu, 160) } };
+}
 function sha256(t) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8).map(function (b) { return ("0" + (b & 255).toString(16)).slice(-2); }).join(""); }
 function tabCo(name, head) { var sh = ss().getSheetByName(name); if (!sh) { sh = ss().insertSheet(name); sh.getRange(1, 1, 1, head.length).setValues([head]); sh.setFrozenRows(1); } return tab(name); }
 var HD_HEAD = ["id", "dangkyId", "ngayKy", "gioMayChu", "phienBan", "hash", "hinh", "hoTen", "ngaySinh", "cccd", "diaChi", "sdt", "nganHang", "soTK", "chuTK", "cccdTruoc", "cccdSau", "dongYAnh", "chuKy", "vanBan", "thietBi", "phien", "trangThai"];
@@ -420,7 +465,9 @@ function kyHopDong(q) {
   var cach = pick(q.cach, ["ban", "thue", "bandut", "tindung"], "ban");
   var anh = cuaPhien(p, q.anh, "sp"); if (anh.length < 3) fail("Cần ít nhất 3 ảnh món đồ", "bad_request");
   var cT = cuaPhien(p, [q.cccdT], "cccd")[0] || "", cS = cuaPhien(p, [q.cccdS], "cccd")[0] || "";
-  if ((cT || cS) && !q.dongAnh) fail("Cần đồng ý riêng về ảnh CCCD", "bad_request");
+  if (!q.dongAnh) fail("Cần đồng ý xử lý ảnh giấy tờ", "bad_request");
+  var gt = pick(q.giayTo, ["cccd", "vneid"], "cccd");
+  if (!cT || (gt === "cccd" && !cS)) fail(gt === "cccd" ? "Cần ảnh CCCD 2 mặt" : "Cần ảnh màn hình VNeID", "bad_request");
   var ky = String(q.ky || ""); if (!/^data:image\/png;base64,/.test(ky) || ky.length > 600000) fail("Thiếu chữ ký", "bad_request");
   var vb = String(q.vanBan || "").slice(0, 30000); if (vb.length < 500) fail("Thiếu nội dung hợp đồng", "bad_request");
   rate("hd_" + sdt, 5, 86400);
@@ -438,7 +485,7 @@ function kyHopDong(q) {
       maHD: maHD, ngay: now("yyyy-MM-dd"), gio: new Date().toISOString(), tt: "moi", capNhat: now() };
     appendObj(t, dk);
     var row = { id: maHD, dangkyId: id, ngayKy: now("yyyy-MM-dd"), gioMayChu: gio, phienBan: txt(q.phienBan, 20), hash: hash, hinh: cach, hoTen: ten, ngaySinh: txt(h.ngaySinh, 10), cccd: cccd, diaChi: txt(h.diaChi, 200), sdt: sdt,
-      nganHang: txt(h.nganHang, 60), soTK: txt(h.soTK, 30).replace(/\s/g, ""), chuTK: txt(h.chuTK, 80), cccdTruoc: cT, cccdSau: cS, dongYAnh: (cT || cS) ? "Có" : "", chuKy: kyId, vanBan: vbId, thietBi: txt(q.ua, 200), phien: p, trangThai: "Đã ký" };
+      nganHang: txt(h.nganHang, 60), soTK: txt(h.soTK, 30).replace(/\s/g, ""), chuTK: txt(h.chuTK, 80), cccdTruoc: cT, cccdSau: cS, dongYAnh: "Có · " + (gt === "vneid" ? "VNeID" : "CCCD") + (q.docTu === "qr" ? " · đọc QR" : q.docTu === "ai" ? " · AI đọc" : ""), chuKy: kyId, vanBan: vbId, thietBi: txt(q.ua, 200), phien: p, trangThai: "Đã ký" };
     hd.sh.appendRow(hd.head.map(function (k) { return cell(row[k] == null ? "" : row[k]); }));
     log(null, "Ký hợp đồng", maHD, id + " · " + cach + " · " + dk.brand);
     return { ok: true, id: id, maHD: maHD, hash: hash };

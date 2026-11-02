@@ -82,8 +82,11 @@ const BR_HOT=["Chanel","Louis Vuitton","Hermès","Dior","Gucci","Coach","SIXDO",
 function soDep(n){ n=Math.round(Number(n)||0); return n?n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,"."):""; }
 const CAOCAP=["sixdo","nem","elise","d.chic","coach","kate spade","michael kors","tory burch","furla","longchamp","massimo dutti","cos","sandro","maje","ted baker","self-portrait","reformation","charles & keith","pedro","marc jacobs","calvin klein","ralph lauren","lacoste"];
 /* Báo giá tức thì [GĐ]: giá bán lại dự kiến = % giá mua theo phân khúc và hạng; tiệm mua đứt = % giá bán dự kiến; tín dụng cộng thêm. */
-const UOC={tamtrung:{A:.30,B:.22,C:.12},caocap:{A:.40,B:.30,C:.18},luxury:{A:.50,B:.40,C:.25}};
-const MUA_DUT={tamtrung:.40,caocap:.45,luxury:.60};
+/* Bản 02/11 14:45 (chị Phúc thấy giá cũ cao): hạ về mặt bằng thị trường Việt Nam [GĐ] */
+const UOC={tamtrung:{A:.28,B:.20,C:.12},caocap:{A:.35,B:.26,C:.16},luxury:{A:.40,B:.30,C:.18}};
+const MUA_DUT={tamtrung:.40,caocap:.45,luxury:.55};
+const KHOANG=[.90,1.05]; /* khoảng giá hiển thị quanh mức giữa */
+const MAT_GIA_NAM={tamtrung:.06,caocap:.05,luxury:.03}, SAN_TUOI=.75; /* trừ thêm mỗi năm kể từ năm mua, không thấp hơn 75% */
 const TIN_DUNG=1.20;
 const GIA_THUE=[130000,260000];
 function phanKhuc(m){ if(m.phanKhuc&&PK[m.phanKhuc]) return m.phanKhuc; const b=String(m.brand||"").toLowerCase().trim(); if(b&&LUX.some(x=>b.includes(x))) return "luxury";
@@ -92,10 +95,13 @@ function danhMuc(m){ if(m.danhMuc&&DM.some(d=>d[0]===m.danhMuc)) return m.danhMu
   if(/túi|\bbag\b|ví|clutch|balo/.test(s)) return "tui"; if(/giày|sandal|cao gót|boot|sneaker|dép/.test(s)) return "giay"; if(/khăn|bông tai|vòng|kính|thắt lưng|phụ kiện|trang sức|nón|mũ/.test(s)) return "phukien";
   if(/vest|blazer|công sở|sơ mi|quần/.test(s)) return "congso"; if(/áo|chân váy|croptop/.test(s)) return "ao"; return "dam"; }
 function tenDM(k){ const d=DM.find(x=>x[0]===k); return d?d[1]:"Tất cả"; }
-/* Luxury theo hãng [GĐ]: hạng A ≈ 85% tỷ lệ giữ giá trong Rebag Clair Report 2024 (Hermès 100%, Chanel 92%, LV 88%, Dior/YSL ~75%, Gucci ~70%, Prada 69%, Celine 64%…), hạng B = A − 10 điểm, hạng C = A − 25 điểm. */
-const HANG_LUX=[["hermès",.85],["hermes",.85],["goyard",.85],["chanel",.78],["louis vuitton",.75],["dior",.64],["saint laurent",.64],["ysl",.64],["gucci",.60],["prada",.59],["celine",.54],["céline",.54],["fendi",.54],["bottega",.54],["balenciaga",.54],["loewe",.51],["chloé",.48],["chloe",.48],["givenchy",.48],["miu miu",.40],["valentino",.40]];
-function tyLeUoc(brand,pk,hang){ const b=String(brand||"").toLowerCase(); const h=pk==="luxury"&&HANG_LUX.find(([k])=>b.includes(k)); if(h){ const a=h[1]; return hang==="A"?a:hang==="B"?a-.10:a-.25; } return (UOC[pk]||UOC.tamtrung)[hang||"B"]; }
-function uocTinh(o){ const pk=phanKhuc({brand:o.brand,giaNiemYet:o.giaMua}); const p=tyLeUoc(o.brand,pk,o.hang||"B"); const giua=tron((Number(o.giaMua)||0)*p); return {pk,giua,thap:tron(giua*.9),cao:tron(giua*1.1)}; }
+/* Luxury theo hãng [GĐ]: hạng A = % giá mua mới khách nhận được khi bán lại ở Việt Nam.
+   Gốc: thứ tự giữ giá theo Rebag Clair Report 2024 (Hermès > Goyard > Chanel > LV > Dior, YSL > Gucci > Prada…), nhân hệ số thị trường Việt Nam ~0,65 vì ít người mua, khách mặc cả nhiều.
+   Hạng B = A × 0,78; hạng C = A × 0,58. Ví dụ YSL 100.000.000đ hạng B: giá bán ~32.800.000đ. */
+const HANG_LUX=[["hermès",.80],["hermes",.80],["goyard",.65],["chanel",.68],["louis vuitton",.58],["dior",.45],["saint laurent",.42],["ysl",.42],["gucci",.40],["prada",.38],["celine",.40],["céline",.40],["fendi",.36],["bottega",.38],["loewe",.38],["balenciaga",.32],["chloé",.30],["chloe",.30],["givenchy",.30],["miu miu",.32],["valentino",.28]];
+function tyLeUoc(brand,pk,hang){ const b=String(brand||"").toLowerCase(); const h=pk==="luxury"&&HANG_LUX.find(([k])=>b.includes(k)); if(h){ const a=h[1]; return hang==="A"?a:hang==="B"?a*.78:a*.58; } return (UOC[pk]||UOC.tamtrung)[hang||"B"]; }
+function heSoTuoi(pk,namMua){ const y=Number(namMua); if(!y) return namMua==="truoc"?SAN_TUOI:1; const n=Math.max(0,new Date().getFullYear()-y); return Math.max(SAN_TUOI,1-(MAT_GIA_NAM[pk]||.05)*n); }
+function uocTinh(o){ const pk=phanKhuc({brand:o.brand,giaNiemYet:o.giaMua}); const p=tyLeUoc(o.brand,pk,o.hang||"B")*heSoTuoi(pk,o.namMua); const giua=tron((Number(o.giaMua)||0)*p); return {pk,giua,thap:tron(giua*KHOANG[0]),cao:tron(giua*KHOANG[1])}; }
 
 let THICH=new Set(); try{ THICH=new Set(JSON.parse(localStorage.getItem("seconde-thich")||"[]")); }catch(e){}
 function luuThich(){ try{ localStorage.setItem("seconde-thich",JSON.stringify([...THICH])); }catch(e){} }
@@ -269,7 +275,7 @@ function khoaBr(s){ return boDau(s).replace(/[^a-z0-9]/g,""); }
 function chuanBrand(s){ s=String(s||"").trim(); if(!s) return ""; const k=khoaBr(s); return BR_ALIAS[k]||BRANDS.find(b=>khoaBr(b)===k)||s; }
 function banMoi(){ let p=""; try{ p=sessionStorage.getItem("sc-phien")||""; }catch(e){} if(!p){ p=Date.now().toString(36)+Math.random().toString(36).slice(2,10); try{ sessionStorage.setItem("sc-phien",p); }catch(e){} }
   return {buoc:1,dm:"",brand:"",giaMua:0,phien:p,anh:[],hdAnh:[],ai:null,aiTT:"",aiKhoa:"",aiDien:[],sua:[],timBr:"",hang:"",model:"",size:"",mau:"",namMua:"",phuKien:[],bangChung:"Hóa đơn",ghiChu:"",cach:"ban",giaSan:0,
-    hd:{hoTen:"",ngaySinh:"",cccd:"",diaChi:"",sdt:"",nganHang:"",soTK:"",chuTK:""},cccdT:null,cccdS:null,ky:"",dong:[false,false,false,false]}; }
+    hd:{hoTen:"",ngaySinh:"",cccd:"",diaChi:"",sdt:"",nganHang:"",soTK:"",chuTK:""},cccdT:null,cccdS:null,gt:"cccd",docTT:"",docTu:"",docLoi:"",tuDien:[],ky:"",dong:[false,false,false,false]}; }
 function veBan(){ const el=document.getElementById("smain"); if(el.dataset.p==="ban") return; el.dataset.p="ban"; S.ban=Object.assign(banMoi(),S.ban||{});
   if(S.ban.buoc>SO_BUOC) S.ban.buoc=1;
   el.innerHTML=`<div class="max gut sect banwrap"><div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button><span class="crumb">Bán & ký gửi</span></div>
@@ -281,7 +287,7 @@ function veBuoc(){ const B=S.ban; const st=document.getElementById("bSteps"); if
   st.innerHTML=BUOC.map((t,i)=>`<li class="${i+1<B.buoc?"xong":i+1===B.buoc?"dang":""}"><b>${i+1}. ${t}</b></li>`).join("");
   const box=document.getElementById("bStep"); box.innerHTML=[null,b1,b2,b3,b4][B.buoc](B); ganBuoc(B); veSide(B); }
 function nav(nut,ghi){ const B=S.ban; return `<div class="row navrow">${B.buoc>1?`<button type="button" class="btn line" data-a="bLui">Quay lại</button>`:"<span></span>"}${nut||""}</div>${ghi!=null?`<p class="small muted thieu" id="bThieu">${ghi}</p>`:""}`; }
-function uocNow(B){ return uocTinh({brand:B.brand,giaMua:B.giaMua,hang:B.hang||"B"}); }
+function uocNow(B){ return uocTinh({brand:B.brand,giaMua:B.giaMua,hang:B.hang||"B",namMua:B.namMua}); }
 function veSide(B){ const s=document.getElementById("bSide"); if(!s) return; const u=B.giaMua?uocNow(B):null, o=u?tinhOffer(B):null, ca=CACH.find(c=>c.k===B.cach);
   s.innerHTML=`<div class="card stack"><h3>Tóm tắt</h3><div class="tiers">
    <div><span>Món</span><b>${esc([B.brand,B.dm?tenDM(B.dm):""].filter(Boolean).join(" · ")||"chờ AI nhận diện")}</b></div>
@@ -372,24 +378,38 @@ function b3(B){ const o=tinhOffer(B); if(B.cach==="thue"&&!o.thue) B.cach="ban";
    <div class="card inner stack" style="gap:6px"><b>Phí và thời gian · ${esc(CACH.find(c=>c.k===B.cach).ten)}</b><div class="tiers">${chiTiet.map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join("")}</div>
     ${B.cach==="ban"?`<label class="f">Giá thấp nhất bạn đồng ý bán (giá sàn, không bắt buộc)<input id="iSan" inputmode="numeric" value="${B.giaSan?soDep(B.giaSan):""}"></label>`:""}</div>
    ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${thap?"disabled":""}>Tiếp: hợp đồng</button>`)}</section>`; }
-/* 4. Hợp đồng */
-function b4(B){ const h=B.hd, canTK=B.cach!=="tindung";
-  return `<section class="card stack"><h2>Thông tin người ký gửi</h2><p class="small muted" style="margin:0">Dùng để lập hợp đồng và xác minh chủ sở hữu. Số CCCD, ảnh CCCD và số tài khoản chỉ chủ tiệm xem được, không hiện trên web.</p>
-   <div class="g2"><label class="f">Họ và tên (như trên CCCD)<input id="hTen" value="${esc(h.hoTen)}" autocomplete="name"></label>
-    <label class="f">Ngày sinh<input id="hNS" type="date" value="${esc(h.ngaySinh)}"></label>
-    <label class="f">Số CCCD (12 số)<input id="hCC" inputmode="numeric" data-plain maxlength="12" value="${esc(h.cccd)}" autocomplete="off"></label>
-    <label class="f">Số Zalo<input id="hSdt" inputmode="tel" data-plain value="${esc(h.sdt)}" autocomplete="tel"></label></div>
-   <label class="f">Địa chỉ thường trú<input id="hDC" value="${esc(h.diaChi)}" autocomplete="street-address"></label>
-   <p class="small muted" style="margin:0">${canAnhCCCD(B)?"Món giá trị từ 10 triệu: cần ảnh CCCD 2 mặt để xác minh chủ sở hữu.":"Ảnh CCCD không bắt buộc với món dưới 10 triệu. Tiệm sẽ đối chiếu CCCD khi nhận đồ."}</p>
-   <div class="g2"><div class="f">Ảnh CCCD mặt trước${canAnhCCCD(B)?"":" (không bắt buộc)"}<label class="drop slim ${B.cccdT&&B.cccdT.id?"done":""}">${B.cccdT?(B.cccdT.id?"Đã gửi · chọn lại":"Đang tải…"):"Chụp mặt trước"}<input type="file" id="hCCT" accept="image/*"></label></div>
-    <div class="f">Ảnh CCCD mặt sau${canAnhCCCD(B)?"":" (không bắt buộc)"}<label class="drop slim ${B.cccdS&&B.cccdS.id?"done":""}">${B.cccdS?(B.cccdS.id?"Đã gửi · chọn lại":"Đang tải…"):"Chụp mặt sau"}<input type="file" id="hCCS" accept="image/*"></label></div></div>
-   ${canTK?`<div class="g2"><label class="f">Ngân hàng nhận tiền<input id="hNH" value="${esc(h.nganHang)}" placeholder="Vietcombank, MB…"></label><label class="f">Số tài khoản<input id="hTK" inputmode="numeric" data-plain value="${esc(h.soTK)}" autocomplete="off"></label><label class="f">Chủ tài khoản<input id="hCTK" value="${esc(h.chuTK)}"></label></div>`:""}
+/* 4. Hợp đồng: xác minh danh tính kiểu ngân hàng (chụp CCCD hoặc VNeID → tự đọc, tự điền) */
+const GT={cccd:{ten:"Thẻ CCCD / căn cước",o:[["T","Mặt trước"],["S","Mặt sau"]]},vneid:{ten:"Chỉ có VNeID",o:[["T","Ảnh màn hình thẻ căn cước"],["S","Trang thông tin thêm (nếu có)"]]}};
+function oGiayTo(B,k,ten){ const o=B["cccd"+k], dong=B.dong[3];
+  return `<div class="f"><span class="fl">${esc(ten)}</span><label class="drop idtile ${o&&o.id?"done":""} ${dong?"":"off"}">${o&&o.url?`<img src="${o.url}" alt="">`:ico("plus2")}
+    <b>${o?(o.id?"Đã gửi · chụp lại":"Đang tải…"):dong?"Chụp hoặc chọn ảnh":"Tích ô đồng ý ở trên trước"}</b><input type="file" id="hCC${k}" accept="image/*" ${dong?"":"disabled"}></label></div>`; }
+function trangThaiDoc(B){ if(B.docTT==="dang") return `<div class="aiwait"><span class="spin"></span><div><b>Đang đọc thông tin trên giấy tờ…</b><div class="small muted">Khoảng 10–20 giây.</div></div></div>`;
+  if(B.docTT==="xong") return `<div class="banner ok small">Đã tự điền ${B.docTu==="qr"?"từ mã QR trên thẻ":"từ ảnh giấy tờ"}. Bạn kiểm tra lại từng ô bên dưới.</div>`;
+  if(B.docTT==="loi") return `<div class="banner bad small row" style="justify-content:space-between;gap:10px"><span>${esc(B.docLoi||"Chưa đọc được giấy tờ.")} Bạn điền tay bên dưới cũng được.</span><button type="button" class="btn line sm" data-a="docLai">Đọc lại</button></div>`;
+  return ""; }
+function tdTag(B,k){ return B.tuDien.includes(k)?` <i class="aitag">Tự điền</i>`:""; }
+function b4(B){ const h=B.hd, canTK=B.cach!=="tindung", g=GT[B.gt]||GT.cccd;
+  return `<section class="card stack"><h2>Xác minh danh tính</h2>
+   <p class="small muted" style="margin:0">Chụp giấy tờ, hệ thống tự đọc và điền vào hợp đồng. Ảnh chỉ chủ tiệm xem được, không hiện trên web.</p>
+   <div class="segs" role="tablist">${Object.entries(GT).map(([k,x])=>`<button type="button" class="chip" data-a="hGT" data-v="${k}" aria-pressed="${B.gt===k}">${x.ten}</button>`).join("")}</div>
+   ${B.gt==="vneid"?`<ol class="small huongdan"><li>Mở ứng dụng VNeID, đăng nhập.</li><li>Vào <b>Ví giấy tờ</b> → <b>Thẻ căn cước</b> (hoặc Căn cước công dân).</li><li>Chụp màn hình trang có họ tên, số định danh, ngày sinh, nơi thường trú rồi tải lên dưới đây.</li></ol>`
+     :`<p class="small muted" style="margin:0">Đặt thẻ trên nền tối, chụp thẳng, đủ sáng, thấy rõ mã QR ở mặt trước.</p>`}
+   <label class="cbx"><input type="checkbox" data-dong="3" ${B.dong[3]?"checked":""}><span>Tôi đồng ý cho CHÉRIE Seconde xử lý <b>ảnh giấy tờ tùy thân</b> (dữ liệu cá nhân nhạy cảm) để xác minh chủ sở hữu và tự điền hợp đồng, theo Điều 9 (b).</span></label>
+   <div class="g2">${g.o.map(([k,ten])=>oGiayTo(B,k,ten)).join("")}</div>
+   <div id="hDoc">${trangThaiDoc(B)}</div>
+  </section>
+  <section class="card stack"><h2>Thông tin người ký gửi</h2>
+   <div class="g2"><label class="f"><span class="fl">Họ và tên${tdTag(B,"hoTen")}</span><input id="hTen" value="${esc(h.hoTen)}" autocomplete="name"></label>
+    <label class="f"><span class="fl">Ngày sinh${tdTag(B,"ngaySinh")}</span><input id="hNS" type="date" value="${esc(h.ngaySinh)}"></label>
+    <label class="f"><span class="fl">Số CCCD / số định danh (12 số)${tdTag(B,"cccd")}</span><input id="hCC" inputmode="numeric" data-plain maxlength="12" value="${esc(h.cccd)}" autocomplete="off"></label>
+    <label class="f"><span class="fl">Số Zalo</span><input id="hSdt" inputmode="tel" data-plain value="${esc(h.sdt)}" autocomplete="tel"></label></div>
+   <label class="f"><span class="fl">Nơi thường trú${tdTag(B,"diaChi")}</span><input id="hDC" value="${esc(h.diaChi)}" autocomplete="street-address"></label>
+   ${canTK?`<div class="g2"><label class="f">Ngân hàng nhận tiền<input id="hNH" value="${esc(h.nganHang)}" placeholder="Vietcombank, MB…"></label><label class="f">Số tài khoản<input id="hTK" inputmode="numeric" data-plain value="${esc(h.soTK)}" autocomplete="off"></label><label class="f">Chủ tài khoản<input id="hCTK" value="${esc(h.chuTK)}" placeholder="Trùng tên người ký gửi"></label></div>`:""}
   </section>
   <section class="card stack"><h2>Hợp đồng ký gửi</h2><div class="hdbox" id="hdText">${vanBanHD(B,true)}</div>
    <label class="cbx"><input type="checkbox" data-dong="0" ${B.dong[0]?"checked":""}><span>Tôi đã đọc và đồng ý toàn bộ điều khoản hợp đồng.</span></label>
    <label class="cbx"><input type="checkbox" data-dong="1" ${B.dong[1]?"checked":""}><span>Tôi cam đoan món đồ là <b>hàng thật</b>, thuộc sở hữu hợp pháp của tôi, và tôi <b>chịu hoàn toàn trách nhiệm</b> nếu món đồ là hàng giả, hàng nhái hoặc có tranh chấp.</span></label>
    <label class="cbx"><input type="checkbox" data-dong="2" ${B.dong[2]?"checked":""}><span>Tôi đồng ý cho CHÉRIE Seconde xử lý số CCCD, số tài khoản và thông tin trên của tôi để lập, thực hiện hợp đồng theo Điều 9.</span></label>
-   ${B.cccdT||B.cccdS||canAnhCCCD(B)?`<label class="cbx"><input type="checkbox" data-dong="3" ${B.dong[3]?"checked":""}><span>Tôi đồng ý riêng cho CHÉRIE Seconde xử lý <b>ảnh CCCD</b> (dữ liệu cá nhân nhạy cảm) để xác minh chủ sở hữu theo Điều 9 (b).</span></label>`:""}
    <div class="f">Chữ ký<div class="kywrap"><canvas id="hKy" width="600" height="180" aria-label="Khung ký tên"></canvas><button type="button" class="btn sm line" data-a="kyLai">Ký lại</button></div><span class="small muted">Ký bằng ngón tay hoặc chuột.</span></div>
    ${nav(`<button type="button" class="btn wine" data-a="bKy" id="bKyBtn">Ký và gửi hợp đồng</button>`)}</section>`; }
 /* Gắn sự kiện cho từng bước */
@@ -406,18 +426,18 @@ function ganBuoc(B){ const g=id=>document.getElementById(id); const stp=g("bStep
       else if(id==="iBrand"){ B.timBr=t.value; g("bOpts").innerHTML=oBrand(B); }
       else if(id==="iGhi") B.ghiChu=t.value.trim(); };
     stp.onchange=e=>{ const t=e.target;
-      if(t.id==="iNam") B.namMua=t.value; else if(t.id==="iBC") B.bangChung=t.value;
+      if(t.id==="iNam"){ B.namMua=t.value; capNhat2(B); } else if(t.id==="iBC") B.bangChung=t.value;
       else if(t.dataset.pk!=null) B.phuKien=[...document.querySelectorAll("[data-pk]")].filter(x=>x.checked).map(x=>x.dataset.pk);
       else if(t.id==="iBrand"){ const v=t.value.trim(); if(v){ const c=chuanBrand(v); if(BRANDS.includes(c)||BR_ALIAS[khoaBr(v)]){ chonBrand(B,c); } } } };
     const h=g("iHD"); h.onchange=async()=>{ const ds=[...h.files].slice(0,3); h.value=""; await taiAnh(ds,"hd",B.hdAnh); };
     if(!B.aiTT&&B.aiKhoa!==khoaAnh(B)) chayAI(); }
   if(B.buoc===3){ const s=g("iSan"); if(s) s.addEventListener("input",()=>{ B.giaSan=tien(s.value); }); }
-  if(B.buoc===4){ const luu=()=>{ const h=B.hd; h.hoTen=g("hTen").value.trim(); h.ngaySinh=g("hNS").value; h.cccd=g("hCC").value.replace(/\D/g,""); h.sdt=g("hSdt").value.trim(); h.diaChi=g("hDC").value.trim();
+  if(B.buoc===4){ const luu=()=>{ const h=B.hd; h.hoTen=g("hTen").value.trim(); h.ngaySinh=g("hNS").value; h.cccd=g("hCC").value.replace(/\D/g,"").slice(0,12); h.sdt=g("hSdt").value.trim(); h.diaChi=g("hDC").value.trim();
       if(g("hNH")){ h.nganHang=g("hNH").value.trim(); h.soTK=g("hTK").value.replace(/\s/g,""); h.chuTK=g("hCTK").value.trim(); }
       document.querySelectorAll("[data-dong]").forEach(x=>B.dong[Number(x.dataset.dong)]=x.checked); g("hdText").innerHTML=vanBanHD(B,true); };
     stp.oninput=e=>{ if(e.target.closest("#hKy")) return; luu(); }; stp.onchange=luu;
-    g("hCCT").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; B.cccdT={}; veBuoc(); B.cccdT=await taiMot(f,"cccd"); veBuoc(); };
-    g("hCCS").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; B.cccdS={}; veBuoc(); B.cccdS=await taiMot(f,"cccd"); veBuoc(); };
+    ["T","S"].forEach(k=>{ const el=g("hCC"+k); if(el) el.onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; await taiGiayTo(B,k,f); }; });
+    const c3=document.querySelector('[data-dong="3"]'); if(c3) c3.addEventListener("change",()=>{ B.dong[3]=c3.checked; veBuoc(); });
     kyCanvas(g("hKy")); } }
 function chonBrand(B,b){ B.brand=b; B.timBr=""; danhDauSua(B,"brand"); if(B.buoc===2){ veBuoc(); } }
 async function taiMot(f,loai){ try{ const bl=await nenAnh(f); const data=await new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=no; r.readAsDataURL(bl); });
@@ -444,6 +464,32 @@ function lyDoChua(B){ const t=[];
   if(B.buoc===2){ if(!B.dm) t.push("danh mục"); if(!B.brand) t.push("thương hiệu"); if(!B.giaMua) t.push("giá mua mới"); if(!B.hang) t.push("tình trạng"); }
   return t.length?"Còn thiếu: "+t.join(", ")+".":""; }
 function kiemBuoc(B){ if(B.buoc===1) return anhXong(B)>=ANH_MIN&&!dangTai(B); if(B.buoc===2) return !!(B.dm&&B.brand&&B.giaMua&&B.hang); if(B.buoc===3) return !(tinhOffer(B).u.giua<GIA_TOI_THIEU&&B.cach==="ban"); return true; }
+/* Đọc giấy tờ: 1) mã QR CCCD ngay trên máy (không gửi đi đâu); 2) không được thì AI đọc chữ trên ảnh (máy chủ). */
+let _qr=null; function napQR(){ if(window.jsQR) return Promise.resolve(window.jsQR); if(_qr) return _qr;
+  _qr=new Promise((ok,no)=>{ const sc=document.createElement("script"); sc.src="/lib/jsQR.min.js?v=1"; sc.onload=()=>ok(window.jsQR); sc.onerror=()=>{ _qr=null; no(new Error("qr")); }; document.head.appendChild(sc); }); return _qr; }
+async function quetQR(file){ try{ const jsQR=await napQR(); const bmp=await createImageBitmap(file);
+    for(const m of [1600,1100,2200]){ const k=Math.min(1,m/Math.max(bmp.width,bmp.height)); const c=document.createElement("canvas"); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
+      const x=c.getContext("2d",{willReadFrequently:true}); x.drawImage(bmp,0,0,c.width,c.height); const d=x.getImageData(0,0,c.width,c.height); const r=jsQR(d.data,c.width,c.height,{inversionAttempts:"attemptBoth"});
+      if(r&&r.data){ const v=docChuoiQR(r.data); if(v) return v; } } }catch(e){} return null; }
+/* Mã QR CCCD: số CCCD|số CMND cũ|Họ tên|ngày sinh ddmmyyyy|giới tính|nơi thường trú|ngày cấp ddmmyyyy */
+function docChuoiQR(t){ const p=String(t).split("|"); if(p.length<6||!/^\d{12}$/.test(p[0])) return null; const ng=x=>/^\d{8}$/.test(x||"")?`${x.slice(4)}-${x.slice(2,4)}-${x.slice(0,2)}`:"";
+  return {cccd:p[0],hoTen:p[2]||"",ngaySinh:ng(p[3]),diaChi:p[5]||""}; }
+function dienGiayTo(B,v,tu){ const h=B.hd; B.tuDien=[]; [["cccd","cccd"],["hoTen","hoTen"],["ngaySinh","ngaySinh"],["diaChi","diaChi"]].forEach(([k,f])=>{ if(v[k]){ h[f]=v[k]; B.tuDien.push(f); } });
+  if(!h.chuTK&&h.hoTen) h.chuTK=boDau(h.hoTen).toUpperCase(); B.docTT="xong"; B.docTu=tu; }
+async function taiGiayTo(B,k,f){ B["cccd"+k]={url:URL.createObjectURL(f)}; veBuoc();
+  const [r,qr]=await Promise.all([taiMot(f,"cccd"), k==="T"&&B.docTT!=="xong"?quetQR(f):Promise.resolve(null)]);
+  if(!r){ B["cccd"+k]=null; veBuoc(); return; } B["cccd"+k]=Object.assign(B["cccd"+k],r);
+  if(qr){ dienGiayTo(B,qr,"qr"); veBuoc(); return; }
+  veBuoc(); docGiayTo(B,false); }
+async function docGiayTo(B,ep){ if(B.docTT==="dang"||(!ep&&B.docTT==="xong")) return;
+  const T=B.cccdT&&B.cccdT.id, Sx=B.cccdS&&B.cccdS.id; if(!T||(B.gt==="cccd"&&!Sx&&!ep)) return;
+  B.docTT="dang"; const box=document.getElementById("hDoc"); if(box) box.innerHTML=trangThaiDoc(B);
+  try{ const r=await SC.call("docGiayTo",{phien:B.phien,ids:[T,Sx].filter(Boolean),loai:B.gt,dong:!!B.dong[3]});
+    if(r.khongCo){ B.docTT="loi"; B.docLoi="Chức năng đọc tự động đang tắt."; }
+    else if(!r.gt||!r.gt.hopLe){ B.docTT="loi"; B.docLoi=(r.gt&&r.gt.ghiChu)||"Ảnh chưa rõ hoặc không phải giấy tờ tùy thân, chụp lại giúp tiệm."; }
+    else dienGiayTo(B,r.gt,"ai");
+  }catch(e){ B.docTT="loi"; B.docLoi=e.message; }
+  if(S.ban===B&&B.buoc===4) veBuoc(); }
 function kyCanvas(c){ const ctx=c.getContext("2d"); const ve=()=>{ ctx.clearRect(0,0,c.width,c.height); if(S.ban.ky){ const im=new Image(); im.onload=()=>ctx.drawImage(im,0,0); im.src=S.ban.ky; } }; ve();
   ctx.lineWidth=3; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#1B1618"; let ve2=false, coNet=false;
   const p=e=>{ const r=c.getBoundingClientRect(); return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]; };
@@ -453,14 +499,14 @@ function kyCanvas(c){ const ctx=c.getContext("2d"); const ve=()=>{ ctx.clearRect
   c.addEventListener("pointerup",het); c.addEventListener("pointercancel",het); }
 async function guiHopDong(btn){ const B=S.ban, h=B.hd;
   const thieu=[]; if(h.hoTen.length<4) thieu.push("họ tên"); if(!/^\d{12}$/.test(h.cccd)) thieu.push("số CCCD 12 số"); if(sdt(h.sdt).length<9) thieu.push("số Zalo"); if(!h.diaChi) thieu.push("địa chỉ");
-  const coAnh=!!((B.cccdT&&B.cccdT.id)||(B.cccdS&&B.cccdS.id)); if(canAnhCCCD(B)&&!((B.cccdT&&B.cccdT.id)&&(B.cccdS&&B.cccdS.id))) thieu.push("ảnh CCCD 2 mặt"); if(B.cach!=="tindung"&&(!h.nganHang||!h.soTK)) thieu.push("tài khoản nhận tiền");
-  if(!B.dong.slice(0,3).every(Boolean)) thieu.push("3 ô đồng ý"); if(coAnh&&!B.dong[3]) thieu.push("ô đồng ý xử lý ảnh CCCD"); if(!B.ky) thieu.push("chữ ký");
+  const coT=!!(B.cccdT&&B.cccdT.id), coS=!!(B.cccdS&&B.cccdS.id); if(!B.dong[3]) thieu.push("ô đồng ý xử lý ảnh giấy tờ"); if(B.gt==="cccd"&&!(coT&&coS)) thieu.push("ảnh CCCD 2 mặt"); if(B.gt==="vneid"&&!coT) thieu.push("ảnh màn hình VNeID"); if(B.cach!=="tindung"&&(!h.nganHang||!h.soTK)) thieu.push("tài khoản nhận tiền");
+  if(!B.dong.slice(0,3).every(Boolean)) thieu.push("3 ô đồng ý");  if(!B.ky) thieu.push("chữ ký");
   if(thieu.length){ toast("Còn thiếu: "+thieu.join(", ")+"."); return; }
   btn.disabled=true; btn.textContent="Đang gửi…";
   try{ const o=tinhOffer(B);
     const r=await SC.call("kyHopDong",{phien:B.phien,dm:B.dm,danhMuc:B.dm,phanKhuc:o.u.pk,brand:B.brand,giaMua:B.giaMua,model:B.model,size:B.size,mau:B.mau,namMua:B.namMua,hang:B.hang,phuKien:B.phuKien,bangChung:B.bangChung,ghiChu:B.ghiChu,
       cach:B.cach,giaSan:B.cach==="ban"?B.giaSan:0,uocTinh:o.u.giua,anh:B.anh.filter(a=>a.id).map(a=>a.id),hdAnh:B.hdAnh.filter(a=>a.id).map(a=>a.id),ai:B.ai,
-      hd:h,cccdT:B.cccdT&&B.cccdT.id||"",cccdS:B.cccdS&&B.cccdS.id||"",dongAnh:!!B.dong[3],ky:B.ky,vanBan:vanBanHD(B,false),phienBan:HD_PHIEN_BAN,ua:navigator.userAgent.slice(0,200)});
+      hd:h,cccdT:B.cccdT&&B.cccdT.id||"",cccdS:B.cccdS&&B.cccdS.id||"",dongAnh:!!B.dong[3],giayTo:B.gt,docTu:B.docTu,ky:B.ky,vanBan:vanBanHD(B,false),phienBan:HD_PHIEN_BAN,ua:navigator.userAgent.slice(0,200)});
     const ca=CACH.find(c=>c.k===B.cach);
     document.getElementById("bStep").innerHTML=`<section class="card stack"><h2>Đã ký hợp đồng</h2>
      <div class="banner ok">Mã yêu cầu <b class="num" style="user-select:all">${esc(r.id)}</b> · Hợp đồng <b class="num" style="user-select:all">${esc(r.maHD)}</b> · ${esc(ca.ten)}</div>
@@ -471,9 +517,9 @@ async function guiHopDong(btn){ const B=S.ban, h=B.hd;
     try{ sessionStorage.removeItem("sc-phien"); }catch(e){} S.ban=null;
   }catch(e){ toast(e.message||"Chưa gửi được, thử lại."); btn.disabled=false; btn.textContent="Ký và gửi hợp đồng"; } }
 /* ---------- Hợp đồng ký gửi (bản 2026-11-02) ---------- */
-const HD_PHIEN_BAN="2026-11-02b";
-const NGUONG_ANH_CCCD=10000000; /* [GĐ] chỉ bắt buộc ảnh CCCD với món giá bán dự kiến từ 10 triệu */
-function canAnhCCCD(B){ return uocNow(B).giua>=NGUONG_ANH_CCCD; }
+const HD_PHIEN_BAN="2026-11-02c";
+/* Từ 02/11 14:45: mọi hợp đồng đều cần ảnh giấy tờ (CCCD 2 mặt hoặc ảnh màn hình VNeID), như Closet. */
+function canAnhCCCD(B){ return true; }
 const BEN_B={ten:"Hộ kinh doanh CHÉRIE (thương hiệu CHÉRIE Seconde)",daiDien:"Lê Nguyễn Hồng Phúc",diaChi:"Đà Nẵng (địa chỉ đăng ký đang cập nhật)",dkkd:"đang cập nhật",lienHe:"Zalo 0377 159 189 · hello@cherie.io.vn"};
 function vanBanHD(B,html){ const h=B.hd, o=tinhOffer(B), ca=CACH.find(c=>c.k===B.cach), mua=B.cach==="bandut"||B.cach==="tindung", hom=ngVN(homNay());
   const e=s=>html?esc(s):String(s==null?"":s), trong=s=>s?e(s):(html?"<i>(chưa điền)</i>":"(chưa điền)");
@@ -497,7 +543,7 @@ function vanBanHD(B,html){ const h=B.hd, o=tinhOffer(B), ca=CACH.find(c=>c.k===B
    ["Điều 6. Cam đoan của Bên A","Bên A cam đoan: (a) món đồ là hàng thật, đúng thương hiệu đã khai, không phải hàng giả, hàng nhái, hàng xâm phạm quyền sở hữu trí tuệ; (b) món đồ thuộc sở hữu hợp pháp của Bên A, không do trộm cắp, lừa đảo mà có, không bị tranh chấp, cầm cố; (c) thông tin và hình ảnh Bên A cung cấp là đúng và đầy đủ, kể cả lỗi đã biết."],
    ["Điều 7. Kiểm định và hàng giả","(a) Bên B kiểm định món đồ khi nhận và có quyền từ chối món không đạt. Nhận định của AI trên website chỉ là sơ bộ, không thay cho kiểm định. (b) Nếu có căn cứ nghi ngờ món đồ là hàng giả hoặc có nguồn gốc bất hợp pháp, Bên B được tạm giữ món đồ, lập biên bản có ảnh, thông báo cho Bên A qua Zalo, và giao cho cơ quan quản lý thị trường hoặc công an khi pháp luật yêu cầu; khi đó Bên B không có nghĩa vụ trả lại món đồ cho Bên A. (c) Đối với người mua, Bên B là bên bán và tự chịu trách nhiệm theo pháp luật bảo vệ quyền lợi người tiêu dùng. Nếu món đồ đã bán bị xác định là hàng giả hoặc vi phạm Điều 6, Bên B hoàn tiền cho người mua trước. (d) Giữa hai bên, Bên A phải bồi hoàn cho Bên B toàn bộ số tiền Bên A đã nhận, mọi khoản Bên B đã trả cho người mua, tiền phạt, chi phí kiểm định, vận chuyển và thiệt hại khác phát sinh từ vi phạm Điều 6, trong 7 ngày kể từ khi Bên B thông báo; Bên B được khấu trừ vào các khoản đang phải trả cho Bên A. (e) Bên A chịu trách nhiệm trước pháp luật về nguồn gốc món đồ do mình cung cấp."],
    ["Điều 8. Bảo quản và rủi ro","Bên B bảo quản món đồ trong thời gian giữ. Món đồ mất hoặc hư hỏng do lỗi của Bên B thì Bên B bồi thường theo giá sàn Bên A đã đặt, hoặc giá bán lại dự kiến nếu chưa đặt giá sàn. Bên B không chịu trách nhiệm về hao mòn tự nhiên và lỗi đã có trước khi nhận. Khi có khiếu nại của người mua, Bên B được tạm giữ khoản tiền liên quan đến khi giải quyết xong."],
-   ["Điều 9. Dữ liệu cá nhân","Theo Luật Bảo vệ dữ liệu cá nhân 2025: (a) Bên B xử lý họ tên, ngày sinh, số CCCD, địa chỉ, số Zalo, số tài khoản và chữ ký của Bên A để lập, thực hiện hợp đồng, thanh toán và xác minh chủ sở hữu. (b) Ảnh CCCD là dữ liệu cá nhân nhạy cảm; Bên B chỉ thu khi Bên A đồng ý riêng, chỉ dùng để xác minh chủ sở hữu món đồ giá trị cao và cung cấp cho cơ quan có thẩm quyền khi có yêu cầu hợp pháp. (c) Dữ liệu lưu riêng, chỉ chủ hộ kinh doanh truy cập, giữ 5 năm sau khi hợp đồng kết thúc rồi xóa. (d) Bên A có quyền xem, sửa, rút lại đồng ý và yêu cầu xóa dữ liệu qua Zalo hoặc email trên; Bên B phản hồi trong 2 ngày làm việc và xóa trong 30 ngày, trừ dữ liệu còn cần cho nghĩa vụ chưa hoàn thành hoặc pháp luật yêu cầu lưu."],
+   ["Điều 9. Dữ liệu cá nhân","Theo Luật Bảo vệ dữ liệu cá nhân 2025: (a) Bên B xử lý họ tên, ngày sinh, số CCCD, địa chỉ, số Zalo, số tài khoản và chữ ký của Bên A để lập, thực hiện hợp đồng, thanh toán và xác minh chủ sở hữu. (b) Ảnh giấy tờ tùy thân (thẻ CCCD hoặc ảnh màn hình VNeID) là dữ liệu cá nhân nhạy cảm; Bên B chỉ thu khi Bên A đồng ý riêng, chỉ dùng để xác minh chủ sở hữu, tự điền thông tin hợp đồng và cung cấp cho cơ quan có thẩm quyền khi có yêu cầu hợp pháp. Thông tin được đọc trước bằng mã QR ngay trên thiết bị của Bên A; nếu không đọc được, ảnh được gửi tới dịch vụ AI của Anthropic, PBC (Hoa Kỳ) chỉ để trích xuất chữ trên giấy tờ, không dùng cho mục đích khác. (c) Dữ liệu lưu riêng, chỉ chủ hộ kinh doanh truy cập, giữ 5 năm sau khi hợp đồng kết thúc rồi xóa. (d) Bên A có quyền xem, sửa, rút lại đồng ý và yêu cầu xóa dữ liệu qua Zalo hoặc email trên; Bên B phản hồi trong 2 ngày làm việc và xóa trong 30 ngày, trừ dữ liệu còn cần cho nghĩa vụ chưa hoàn thành hoặc pháp luật yêu cầu lưu."],
    ["Điều 10. Giao kết điện tử","Hợp đồng được giao kết bằng phương tiện điện tử theo Luật Giao dịch điện tử 2023. Bên A đánh dấu đồng ý, ghi họ tên và ký tay trên màn hình; hai bên thỏa thuận chữ ký này là chữ ký điện tử của Bên A. Máy chủ lưu nội dung hợp đồng, phiên bản, mã SHA-256 của nội dung, ảnh chữ ký, thời điểm ký theo giờ máy chủ (UTC+7) và thông tin thiết bị. Bên B xác nhận hợp đồng bằng tin nhắn Zalo kèm mã hợp đồng hoặc khi nhận đồ, và gửi bản hợp đồng cho Bên A khi được yêu cầu."],
    ["Điều 11. Giải quyết tranh chấp","Hai bên thương lượng trước. Không thương lượng được thì đưa ra Tòa án nhân dân có thẩm quyền tại thành phố Đà Nẵng."]];
   if(!html) return dk.map(([t,b])=>(t?t+"\n":"")+(b||"")).join("\n\n");
@@ -933,6 +979,8 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   if(a==="bBoAnh"){ S.ban.anh.splice(Number(v),1); if(S.ban.aiTT!=="dang") S.ban.aiTT=""; veBuoc(); return; }
   if(a==="bAI"){ S.ban.aiTT=""; S.ban.aiKhoa=""; chayAI(); return; }
   if(a==="kyLai"){ S.ban.ky=""; const c=document.getElementById("hKy"); c.getContext("2d").clearRect(0,0,c.width,c.height); return; }
+  if(a==="hGT"){ S.ban.gt=v; S.ban.cccdT=null; S.ban.cccdS=null; S.ban.docTT=""; veBuoc(); return; }
+  if(a==="docLai"){ S.ban.docTT=""; docGiayTo(S.ban,true); return; }
   if(a==="bKy") return guiHopDong(el);
   if(a==="heroTab"){ S.heroTab=v; document.getElementById("heroDuo").dataset.tab=v; document.querySelectorAll('[data-a="heroTab"]').forEach(b=>b.setAttribute("aria-selected",b===el)); return; }
   if(a==="hieu"){ e.preventDefault(); closeSheet(); datLoc({hieu:v}); return; }
