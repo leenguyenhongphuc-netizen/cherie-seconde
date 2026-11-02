@@ -1,20 +1,21 @@
+/* Màu riêng Seconde: rêu #4F5B3A (tối #9DB08A), nền nhạt #E8EBE0 — theo Tóm tắt – Seconde. Biến vẫn tên --wine để khớp code cũ. */
 /* Hai giao diện tách rời trong cùng kho dữ liệu: Cửa hàng (khách) và Quản trị (#quan-tri, nhân viên).
    Cửa hàng: lưới sản phẩm 2 cột trên điện thoại, giỏ hàng trượt. Quản trị: thanh bên trên máy tính, thanh dưới trên điện thoại. */
 :root{
   --bg:#F7F5F4;--surface:#FFFFFF;--ink:#1B1618;--muted:#6C6266;--line:#E7E0DD;--soft:#F1ECEA;
-  --wine:#7A1F3D;--wine-ink:#FFFFFF;--wine-soft:#F4E6EB;--gold:#8C6B3A;--gold-soft:#F5EEE4;
+  --wine:#4F5B3A;--wine-ink:#FFFFFF;--wine-soft:#E8EBE0;--gold:#8C6B3A;--gold-soft:#F5EEE4;
   --ok:#2F6B4F;--ok-soft:#E4F0E9;--warn:#985A0C;--warn-soft:#FBEEDA;--bad:#A3263A;--bad-soft:#F9E2E6;--info:#36556E;--info-soft:#E5EDF3;
   --display:'Bodoni Moda',Didot,Georgia,serif;--body:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',sans-serif;
   --r:14px;--r-sm:10px;--shadow:0 1px 2px rgba(27,22,24,.06),0 8px 24px rgba(27,22,24,.06);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#141011;--surface:#1E1819;--ink:#F2ECEA;--muted:#B0A4A8;--line:#382D30;--soft:#2A2124;
-  --wine:#D98AA2;--wine-ink:#1B1214;--wine-soft:#3A2129;--gold:#D4B37E;--gold-soft:#32281B;
+  --wine:#9DB08A;--wine-ink:#141A0F;--wine-soft:#262C1E;--gold:#D4B37E;--gold-soft:#32281B;
   --ok:#90CDAF;--ok-soft:#1D3128;--warn:#E9B66C;--warn-soft:#382A16;--bad:#F29CA9;--bad-soft:#3D1E24;--info:#9EC1DC;--info-soft:#1C2A35;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141011;--surface:#1E1819;--ink:#F2ECEA;--muted:#B0A4A8;--line:#382D30;--soft:#2A2124;
-  --wine:#D98AA2;--wine-ink:#1B1214;--wine-soft:#3A2129;--gold:#D4B37E;--gold-soft:#32281B;
+  --wine:#9DB08A;--wine-ink:#141A0F;--wine-soft:#262C1E;--gold:#D4B37E;--gold-soft:#32281B;
   --ok:#90CDAF;--ok-soft:#1D3128;--warn:#E9B66C;--warn-soft:#382A16;--bad:#F29CA9;--bad-soft:#3D1E24;--info:#9EC1DC;--info-soft:#1C2A35;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark}
 *{box-sizing:border-box}
