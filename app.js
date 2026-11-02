@@ -310,7 +310,7 @@ function b1(B){ const ok=anhXong(B);
   return `<section class="card stack"><h2>Chụp ảnh món đồ</h2>
    <p class="small muted" style="margin:0">Cần ${ANH_MIN}–${ANH_MAX} ảnh rõ, đủ sáng. Nên có một ảnh logo hoặc tem bên trong để AI nhận đúng hãng. Ảnh chỉ tiệm xem được.</p>
    <div class="thumbs" id="bThumbs">${B.anh.map((a,i)=>`<div class="t"><div class="ph"><img src="${a.url}" alt="Ảnh ${i+1}">${a.id?`<span class="so">${i+1}</span>`:`<span class="upl">${a.loi?"Lỗi":"Đang tải…"}</span>`}</div><button type="button" data-a="bBoAnh" data-v="${i}" aria-label="Bỏ ảnh ${i+1}">×</button></div>`).join("")}
-    ${B.anh.length<ANH_MAX?`<label class="drop tile">${ico("plus2")}<b>${B.anh.length?"Thêm ảnh":"Chụp hoặc chọn ảnh"}</b><span class="small muted">${B.anh.length}/${ANH_MAX}</span><input type="file" id="bFile" accept="image/*" multiple></label>`:""}</div>
+    ${B.anh.length<ANH_MAX?`<label class="drop tile ${B.anh.length?"":"wide"}">${ico("plus2")}<b>${B.anh.length?"Thêm ảnh":"Chụp hoặc chọn ảnh"}</b><span class="small muted">${B.anh.length}/${ANH_MAX}</span><input type="file" id="bFile" accept="image/*" multiple></label>`:""}</div>
    ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${kiemBuoc(B)?"":"disabled"}>Tiếp: AI điền thông tin</button>`,lyDoChua(B))}</section>`; }
 
 /* 2. AI điền sẵn, khách kiểm tra */
