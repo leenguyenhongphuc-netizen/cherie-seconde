@@ -11,4 +11,4 @@ function doPost(e) { return napMa_().doPost(e); }
 function lamMoi() { CacheService.getScriptCache().remove("ma"); napMa_().kiemTra(); }
 function dangXuatTatCa() { napMa_().dangXuatTatCa(); }
 /* Không cần chạy: chỉ để Google biết máy chủ cần quyền Sheet, Drive, tải mạng */
-function quyen_() { SpreadsheetApp.openById("x"); DriveApp.getRootFolder(); UrlFetchApp.fetch("x"); }
+function quyen_() { SpreadsheetApp.openById("x"); DriveApp.getRootFolder().createFolder("x"); DriveApp.createFile("x", "x"); DriveApp.getFileById("x").setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); UrlFetchApp.fetch("x"); }
