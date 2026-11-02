@@ -485,3 +485,9 @@ div.f > b{color:var(--ink)}
 .drop.idtile b{position:relative;color:var(--ink);font-size:13.5px;background:color-mix(in srgb,var(--surface) 80%,transparent);padding:3px 8px;border-radius:999px}
 .drop.idtile.off{opacity:.55;cursor:not-allowed}
 .huongdan{margin:0;padding-left:18px;color:var(--muted);display:grid;gap:2px}
+/* Bán 6 bước (02/11 15:15) */
+.stepper{grid-template-columns:repeat(6,minmax(0,1fr))}
+.stepper li.now{grid-column:1/-1;font-size:13.5px;color:var(--muted);display:none}
+.stepper li.now::before{display:none}
+.stepper li.now b{display:inline!important;color:var(--ink);font-size:13.5px}
+@media (max-width:760px){.stepper li:not(.now) b{display:none!important}.stepper li.now{display:block}}
