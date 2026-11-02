@@ -59,7 +59,15 @@ function render(){ const v=hienTai(), shell=laAdmin()?"adm":"shop";
   if(shell!==lastShell){ lastShell=shell; document.getElementById("app").innerHTML=shell==="adm"?admShell():shopShell(); }
   if(shell==="adm") renderAdm(v); else renderShop(v); }
 let hen=0; function veLai(){ cancelAnimationFrame(hen); hen=requestAnimationFrame(render); }
-window.addEventListener("hashchange",()=>{ closeSheet(); render(); window.scrollTo({top:0}); });
+const NAV={dem:0};
+window.addEventListener("hashchange",()=>{ NAV.dem++; closeSheet(); render(); window.scrollTo({top:0}); });
+/* ô tiền: tự thêm dấu chấm 20.000.000 khi gõ (bỏ qua ô có data-plain) */
+function laOTien(t){ return t&&t.tagName==="INPUT"&&t.getAttribute("inputmode")==="numeric"&&!t.hasAttribute("data-plain"); }
+function dinhDangTien(t){ const v=t.value, pos=t.selectionStart==null?v.length:t.selectionStart, truoc=v.slice(0,pos).replace(/\D/g,"").length;
+  const so=v.replace(/\D/g,"").replace(/^0+(?=\d)/,""); const moi=so?so.replace(/\B(?=(\d{3})+(?!\d))/g,"."):""; if(moi===v) return; t.value=moi;
+  let k=0,c=0; while(k<moi.length&&c<truoc){ if(/\d/.test(moi[k])) c++; k++; } try{ if(document.activeElement===t) t.setSelectionRange(k,k); }catch(e){} }
+document.addEventListener("input",e=>{ if(laOTien(e.target)) dinhDangTien(e.target); },true);
+new MutationObserver(()=>{ document.querySelectorAll('input[inputmode="numeric"]:not([data-plain]):not([data-dd])').forEach(t=>{ t.dataset.dd=1; if(t.value) dinhDangTien(t); }); }).observe(document.documentElement,{childList:true,subtree:true});
 
 /* =================================================================
    CỬA HÀNG (khách) — kiểu sàn: hai việc tách rõ
@@ -69,6 +77,9 @@ window.addEventListener("hashchange",()=>{ closeSheet(); render(); window.scroll
 const DM=[["dam","Đầm dự tiệc"],["congso","Đồ công sở"],["ao","Áo & chân váy"],["tui","Túi xách"],["giay","Giày"],["phukien","Phụ kiện"]];
 const PK={tamtrung:{ten:"Tầm trung",mo:"Thương hiệu Việt và quốc tế phổ thông"},caocap:{ten:"Cao cấp",mo:"Designer Việt, contemporary"},luxury:{ten:"Luxury",mo:"Hàng hiệu đã kiểm định nguồn gốc"}};
 const LUX=["chanel","hermès","hermes","louis vuitton","dior","gucci","prada","celine","céline","fendi","bottega","saint laurent","ysl","balenciaga","givenchy","valentino","loewe","burberry","miu miu","chloé","chloe","versace","cartier","bvlgari","tiffany","goyard","jimmy choo","manolo"];
+const BRANDS=["Hermès","Chanel","Louis Vuitton","Dior","Gucci","Prada","Celine","Fendi","Bottega Veneta","Saint Laurent","Balenciaga","Givenchy","Valentino","Loewe","Burberry","Miu Miu","Chloé","Goyard","Coach","Kate Spade","Michael Kors","Tory Burch","Furla","Longchamp","Marc Jacobs","Charles & Keith","Pedro","Massimo Dutti","COS","Sandro","Maje","Zara","Mango","SIXDO","NEM","Elise","D.Chic"];
+const BR_HOT=["Chanel","Louis Vuitton","Hermès","Dior","Gucci","Coach","SIXDO","NEM"];
+function soDep(n){ n=Math.round(Number(n)||0); return n?n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,"."):""; }
 const CAOCAP=["sixdo","nem","elise","d.chic","coach","kate spade","michael kors","tory burch","furla","longchamp","massimo dutti","cos","sandro","maje","ted baker","self-portrait","reformation","charles & keith","pedro","marc jacobs","calvin klein","ralph lauren","lacoste"];
 /* Báo giá tức thì [GĐ]: giá bán lại dự kiến = % giá mua theo phân khúc và hạng; tiệm mua đứt = % giá bán dự kiến; tín dụng cộng thêm. */
 const UOC={tamtrung:{A:.30,B:.22,C:.12},caocap:{A:.40,B:.30,C:.18},luxury:{A:.50,B:.40,C:.25}};
@@ -95,13 +106,13 @@ const SV={dam:'<path d="M9.5 3h5l-.8 4.2L18 20H6l4.3-12.8z"/><path d="M10.2 7.2h
  luxury:'<path d="M12 3.5l2.4 5.3 5.6.6-4.2 3.8 1.2 5.6L12 16l-5 2.8 1.2-5.6L4 9.4l5.6-.6z"/>',giam:'<path d="M3.5 12.5l8.5-8.5h8v8l-8.5 8.5z"/><circle cx="15.5" cy="8.5" r="1.4"/>',
  search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
  cart:'<path d="M3.5 4.5h2.3l2 11h10.5l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>',menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
- left:'<path d="M15 5l-7 7 7 7"/>',right:'<path d="M9 5l7 7-7 7"/>',shield:'<path d="M12 3l7 3v5c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+ left:'<path d="M15 5l-7 7 7 7"/>',plus2:'<path d="M12 5v14M5 12h14"/>',right:'<path d="M9 5l7 7-7 7"/>',shield:'<path d="M12 3l7 3v5c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
  cash:'<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.5"/>',clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
  swap:'<path d="M5 8h13l-3-3M19 16H6l3 3"/>',rent:'<path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/>'};
 function ico(k,cls){ return `<svg class="${cls||"ico"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SV[k]||""}</svg>`; }
 
 function shopShell(){ return `
- <div class="annc gut"><span>Mỗi món qua xưởng CHÉRIE Care giặt hấp và kiểm định · Giao toàn quốc · Đổi trả 3 ngày</span></div>
+ <div class="annc" aria-label="Mỗi món qua xưởng CHÉRIE Care giặt hấp và kiểm định. Giao toàn quốc. Đổi trả 3 ngày. Báo giá bán đồ ngay trên web."><div class="track" aria-hidden="true">${[0,1].map(()=>`<span>Mỗi món qua xưởng CHÉRIE Care giặt hấp và kiểm định</span><i>✦</i><span>Giao toàn quốc · Đà Nẵng giao thứ 2, thứ 6</span><i>✦</i><span>Đổi trả 3 ngày</span><i>✦</i><span>Bán đồ hiệu: báo giá ngay, AI xem ảnh sơ bộ</span><i>✦</i>`).join("")}</div></div>
  <header class="shead"><div class="in max gut">
    <a class="word" href="#">CHÉRIE<em>Seconde</em></a>
    <button class="catbtn" data-a="menuDM" aria-label="Danh mục">${ico("menu")}<span>Danh mục</span></button>
@@ -130,7 +141,7 @@ function renderShop(){ const r=trangShop();
   const hh=document.querySelector(".shead"); if(hh) document.documentElement.style.setProperty("--hh",hh.offsetHeight+"px");
   if(r.startsWith("sp-")) veSanPham(r.slice(3)); else ({"trang-chu":veTrangChu,mua:veMua,ban:veBan,"tra-cuu":veTraCuu,"yeu-thich":veThich})[r]();
   if(sheetOpen()&&document.getElementById("cartPanel")) veGio(); }
-const LOC0={dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""};
+const LOC0={hieu:"all",dm:"all",pk:"all",hang:"all",size:"all",gia:"all",nguon:"all",giam:"",sort:"moi",q:""};
 function laLocDon(k){ const f=S.shop; return Object.keys(LOC0).filter(x=>x!=="sort"&&x!==k).every(x=>f[x]===LOC0[x]); }
 function datLoc(o){ S.shop=Object.assign({},LOC0,o); const q=document.getElementById("sq"); if(q) q.value=S.shop.q; if(location.hash==="#mua"){ document.getElementById("smain").dataset.p=""; veLai(); window.scrollTo({top:0}); } else location.hash="mua"; }
 function dsBan(){ return S.mon.filter(m=>m.tt==="dang"&&m.nguon!=="kyguithue"); }
@@ -149,15 +160,18 @@ function trongKe(){ return `<div class="empty"><b>${S.ready?"Kệ đang được
 /* ---------- Trang chủ ---------- */
 function veTrangChu(){ const el=document.getElementById("smain"), t=homNay();
   if(el.dataset.p!=="trang-chu"){ el.dataset.p="trang-chu";
-  el.innerHTML=`<section class="band"><div class="max gut duo">
-    <div class="mission"><div class="eyebrow">Mua</div><h1>Đồ hiệu đã qua sử dụng, giặt hấp và kiểm định sẵn.</h1>
+  el.innerHTML=`<section class="band"><div class="max gut">
+   <div class="hsw" role="tablist" aria-label="Bạn muốn">${[["mua","Mua đồ hiệu"],["ban","Bán đồ của bạn"]].map(([k,t])=>`<button role="tab" data-a="heroTab" data-v="${k}" aria-selected="${(S.heroTab||"mua")===k}">${t}</button>`).join("")}</div>
+   <div class="duo" id="heroDuo" data-tab="${S.heroTab||"mua"}">
+    <div class="mission buy"><div class="eyebrow">Mua</div><h1>Đồ hiệu đã qua sử dụng, giặt hấp và kiểm định sẵn.</h1>
       <p>Từ đầm thương hiệu Việt đến túi luxury. Hạng A, B, C ghi rõ, ảnh tình trạng thật, đổi trả 3 ngày.</p>
-      <div class="row"><a class="btn light" href="#mua" data-a="loc" data-k="reset">Mua sắm ngay</a><a class="btn ghost" href="#mua" data-a="loc" data-k="pk" data-v="luxury">Xem Luxury</a></div></div>
+      <a class="btn light cta" href="#mua" data-a="loc" data-k="reset">Mua sắm ngay</a>
+      <div class="bwrap"><span class="small">Mua theo thương hiệu</span><div class="bchips">${BR_HOT.map(b=>`<a href="#mua" data-a="hieu" data-v="${esc(b)}">${esc(b)}</a>`).join("")}<button type="button" data-a="menuBrand">Tất cả hãng</button></div></div></div>
     <form class="mission sell" id="fQ"><div class="eyebrow">Bán</div><h2>Tủ đồ đẹp nằm yên thì tiếc.</h2>
-      <p>Nhập món bạn muốn bán, xem ngay bạn nhận được bao nhiêu với 4 cách bán.</p>
-      <div class="qq"><input id="qBrand" placeholder="Thương hiệu, ví dụ Coach" list="dsBrandKH" aria-label="Thương hiệu"><input id="qGia" inputmode="numeric" placeholder="Giá mua lúc đầu" aria-label="Giá mua lúc đầu"><button class="btn light" type="submit">Xem báo giá</button></div>
-      <datalist id="dsBrandKH">${LUX.concat(CAOCAP).filter(x=>x.length>3).map(x=>`<option value="${esc(x.replace(/\b\w/g,c=>c.toUpperCase()))}">`).join("")}</datalist></form>
-  </div></section>
+      <p>Nhập món bạn muốn bán, xem ngay giá bán lại dự kiến. Gửi ảnh để AI đánh giá và ký gửi online.</p>
+      <div class="qq"><input id="qBrand" placeholder="Thương hiệu, ví dụ Coach" list="dsBrandKH" aria-label="Thương hiệu" autocomplete="off"><input id="qGia" class="money" inputmode="numeric" placeholder="Giá mua lúc đầu, ví dụ 20.000.000" aria-label="Giá mua lúc đầu"><button class="btn light cta" type="submit">Xem báo giá</button></div>
+      <datalist id="dsBrandKH">${BRANDS.map(b=>`<option value="${esc(b)}">`).join("")}</datalist></form>
+   </div></div></section>
   <section class="max gut cats" aria-label="Danh mục">${DM.map(([k,tx])=>`<a href="#mua" data-a="loc" data-k="dm" data-v="${k}" class="cat"><span class="circ">${ico(k,"cico")}</span><span>${tx}</span></a>`).join("")}
     <a href="#mua" data-a="loc" data-k="pk" data-v="luxury" class="cat"><span class="circ lux">${ico("luxury","cico")}</span><span>Luxury</span></a>
     <a href="#mua" data-a="loc" data-k="giam" data-v="1" class="cat"><span class="circ">${ico("giam","cico")}</span><span>Đang giảm giá</span></a></section>
@@ -171,7 +185,7 @@ function veTrangChu(){ const el=document.getElementById("smain"), t=homNay();
     <div>${ico("cash","wico")}<b>Đổi trả 3 ngày</b>Không vừa, gửi lại trong 3 ngày kể từ khi nhận.</div></div></section>
   <section class="max gut sect"><div class="sellband"><div><div class="eyebrow">Bán cùng CHÉRIE</div><h2>Bốn cách bán, bạn chọn cách có lợi nhất.</h2></div>
     <div class="ways">${CACH.map(c=>`<a href="#ban" data-a="goSell" data-v="${c.k}">${ico(c.ic,"wico")}<b>${c.ten}</b><span>${c.ngan}</span></a>`).join("")}</div></div></section>`;
-  document.getElementById("fQ").addEventListener("submit",ev=>{ ev.preventDefault(); S.ban=Object.assign(S.ban||{},{brand:val("qBrand").trim(),giaMua:tien(val("qGia"))}); location.hash="ban"; }); }
+  document.getElementById("fQ").addEventListener("submit",ev=>{ ev.preventDefault(); S.ban=Object.assign(banMoi(),{brand:val("qBrand").trim(),giaMua:tien(val("qGia")),buoc:1}); location.hash="ban"; }); }
   const ds=dsBan();
   document.getElementById("hPK").innerHTML=Object.entries(PK).map(([k,p])=>{ const l=ds.filter(m=>phanKhuc(m)===k); const mn=l.length?Math.min(...l.map(m=>giaNay(m,t))):0;
     return `<a href="#mua" data-a="loc" data-k="pk" data-v="${k}" class="tier ${k}"><b>${p.ten}</b><span>${p.mo}</span><em class="num">${l.length?`${l.length} món · từ ${vnd(mn)}`:"Sắp lên kệ"}</em></a>`; }).join("");
@@ -182,6 +196,7 @@ function veTrangChu(){ const el=document.getElementById("smain"), t=homNay();
 /* ---------- Mua: duyệt và lọc ---------- */
 const GIA_KHOANG={all:["Mọi mức giá",0,1e15],d1:["Dưới 1 triệu",0,999999],d3:["1 – 3 triệu",1e6,3e6],d10:["3 – 10 triệu",3000001,1e7],t10:["Trên 10 triệu",10000001,1e15]};
 function locSP(){ const f=S.shop,t=homNay(),q=f.q.trim().toLowerCase(); let l=dsBan();
+  if(f.hieu!=="all") l=l.filter(m=>String(m.brand||"").toLowerCase()===f.hieu.toLowerCase());
   if(f.dm!=="all") l=l.filter(m=>danhMuc(m)===f.dm); if(f.pk!=="all") l=l.filter(m=>phanKhuc(m)===f.pk);
   if(f.hang!=="all") l=l.filter(m=>m.hang===f.hang); if(f.size!=="all") l=l.filter(m=>m.size===f.size);
   if(f.nguon==="cherie") l=l.filter(m=>!laKG(m)); if(f.nguon==="kygui") l=l.filter(m=>laKG(m)); if(f.giam) l=l.filter(m=>dangGiam(m,t));
@@ -192,16 +207,17 @@ function locSP(){ const f=S.shop,t=homNay(),q=f.q.trim().toLowerCase(); let l=ds
 function veMua(){ const el=document.getElementById("smain"), f=S.shop, t=homNay();
   if(el.dataset.p!=="mua"){ el.dataset.p="mua"; el.innerHTML=`<div class="max gut"><div class="mhead" id="mHead"></div><div class="filters" id="mBar"></div><div id="mTags" class="mtags"></div><div id="mList"></div></div>`; }
   const l=locSP(), all=dsBan(), sizes=[...new Set(all.map(m=>m.size).filter(Boolean))].sort();
-  const tieuDe=f.q?`Kết quả cho “${esc(f.q)}”`:[f.dm!=="all"?tenDM(f.dm):"",f.pk!=="all"?PK[f.pk].ten:"",f.giam?"Đang giảm giá":""].filter(Boolean).join(" · ")||"Tất cả món";
-  document.getElementById("mHead").innerHTML=`<nav class="crumb"><a href="#">Trang chủ</a> / <span>Mua</span></nav><h1>${tieuDe}</h1><p class="muted num">${l.length} món${S.ready?"":" · đang tải…"}</p>`;
+  const tieuDe=f.q?`Kết quả cho “${esc(f.q)}”`:[f.hieu!=="all"?f.hieu:"",f.dm!=="all"?tenDM(f.dm):"",f.pk!=="all"?PK[f.pk].ten:"",f.giam?"Đang giảm giá":""].filter(Boolean).join(" · ")||"Tất cả món";
+  document.getElementById("mHead").innerHTML=`<div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button><nav class="crumb"><a href="#">Trang chủ</a> / <span>Mua</span></nav></div><h1>${tieuDe}</h1><p class="muted num">${l.length} món${S.ready?"":" · đang tải…"}</p>`;
   const sel=(k,opts,lab)=>`<label class="chipsel ${f[k]!==LOC0[k]?"on":""}"><span class="sr">${lab}</span><select data-loc="${k}" aria-label="${lab}">${opts.map(([v,tx])=>`<option value="${esc(v)}" ${String(f[k])===String(v)?"selected":""}>${esc(tx)}</option>`).join("")}</select></label>`;
-  document.getElementById("mBar").innerHTML=sel("dm",[["all","Danh mục"]].concat(DM),"Danh mục")+sel("pk",[["all","Phân khúc"]].concat(Object.entries(PK).map(([k,p])=>[k,p.ten])),"Phân khúc")
+  const hieus=[...new Set(all.map(m=>m.brand).filter(Boolean).concat(f.hieu!=="all"?[f.hieu]:[]))].sort();
+  document.getElementById("mBar").innerHTML=sel("hieu",[["all","Thương hiệu"]].concat(hieus.map(b=>[b,b])),"Thương hiệu")+sel("dm",[["all","Danh mục"]].concat(DM),"Danh mục")+sel("pk",[["all","Phân khúc"]].concat(Object.entries(PK).map(([k,p])=>[k,p.ten])),"Phân khúc")
     +sel("gia",Object.entries(GIA_KHOANG).map(([k,x])=>[k,k==="all"?"Giá":x[0]]),"Giá")+sel("hang",[["all","Tình trạng"],["A","Hạng A · như mới"],["B","Hạng B · còn đẹp"],["C","Hạng C · lỗi nhỏ"]],"Tình trạng")
     +(sizes.length?sel("size",[["all","Size"]].concat(sizes.map(s=>[s,"Size "+s])),"Size"):"")+sel("nguon",[["all","Nguồn hàng"],["cherie","Của CHÉRIE"],["kygui","Ký gửi"]],"Nguồn hàng")
     +`<button class="chip" data-a="locGiam" aria-pressed="${!!f.giam}">Đang giảm giá</button><span class="grow"></span>`+sel("sort",[["moi","Mới lên kệ"],["re","Tiết kiệm nhiều nhất"],["tang","Giá thấp đến cao"],["giam","Giá cao đến thấp"]],"Sắp xếp");
   document.getElementById("mBar").querySelectorAll("select[data-loc]").forEach(s=>s.onchange=()=>{ f[s.dataset.loc]=s.value; veMua(); });
   const tags=Object.keys(LOC0).filter(k=>k!=="sort"&&f[k]!==LOC0[k]);
-  document.getElementById("mTags").innerHTML=tags.length?tags.map(k=>`<button class="chip on" data-a="boLoc" data-k="${k}">${esc(k==="q"?"“"+f.q+"”":k==="dm"?tenDM(f.dm):k==="pk"?PK[f.pk].ten:k==="gia"?GIA_KHOANG[f.gia][0]:k==="hang"?"Hạng "+f.hang:k==="size"?"Size "+f.size:k==="nguon"?(f.nguon==="cherie"?"Của CHÉRIE":"Ký gửi"):"Đang giảm giá")} ×</button>`).join("")+`<button class="linkbtn" data-a="loc" data-k="reset">Xoá bộ lọc</button>`:"";
+  document.getElementById("mTags").innerHTML=tags.length?tags.map(k=>`<button class="chip on" data-a="boLoc" data-k="${k}">${esc(k==="q"?"“"+f.q+"”":k==="hieu"?f.hieu:k==="dm"?tenDM(f.dm):k==="pk"?PK[f.pk].ten:k==="gia"?GIA_KHOANG[f.gia][0]:k==="hang"?"Hạng "+f.hang:k==="size"?"Size "+f.size:k==="nguon"?(f.nguon==="cherie"?"Của CHÉRIE":"Ký gửi"):"Đang giảm giá")} ×</button>`).join("")+`<button class="linkbtn" data-a="loc" data-k="reset">Xoá bộ lọc</button>`:"";
   document.getElementById("mList").innerHTML=luoi(l,t,all.length?`<div class="empty"><b>Không có món khớp</b>Thử bỏ bớt bộ lọc, hoặc <a href="#ban">bán món bạn đang tìm cho người khác</a>.</div>`:trongKe()); }
 
 /* ---------- Trang sản phẩm ---------- */
@@ -212,7 +228,7 @@ function veSanPham(id){ const el=document.getElementById("smain"), t=homNay(), m
   const tot=TOT.filter(([k])=>c[k]).map(x=>x[1]), loi=LOI.filter(([k])=>c[k]).map(x=>x[1]); const nx=lanGiamToi(m,t);
   const lq=dsBan().filter(x=>x.id!==id).map(x=>[x,(danhMuc(x)===dm?2:0)+(phanKhuc(x)===pk?1:0)]).filter(x=>x[1]).sort((p,q)=>q[1]-p[1]).slice(0,4).map(x=>x[0]);
   S.spAnh=0;
-  el.innerHTML=`<div class="max gut sp"><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#mua" data-a="loc" data-k="dm" data-v="${dm}">${tenDM(dm)}</a> / <span>${esc(m.ten)}</span></nav>
+  el.innerHTML=`<div class="max gut sp"><div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#mua" data-a="loc" data-k="dm" data-v="${dm}">${tenDM(dm)}</a> / <span>${esc(m.ten)}</span></nav></div>
    <div class="spgrid"><div class="gallery">${a.length>1?`<div class="thumbs-v">${a.map((x,i)=>`<button data-a="anhSP" data-v="${i}" aria-label="Ảnh ${i+1}" aria-pressed="${i===0}"><img src="${anh(x,200)}" alt=""></button>`).join("")}</div>`:""}
      <div class="mainimg"><div id="spMain">${a.length?`<img src="${anh(a[0],1200)}" alt="${esc(m.ten)}">`:phHtml(m)}</div>
        ${a.length>1?`<button class="nav l" data-a="anhSP" data-v="-1" aria-label="Ảnh trước">${ico("left")}</button><button class="nav r" data-a="anhSP" data-v="+1" aria-label="Ảnh sau">${ico("right")}</button>`:""}
@@ -236,74 +252,223 @@ function doiAnhSP(v){ const m=S.mon.find(x=>"sp-"+x.id===trangShop()); if(!m) re
   document.getElementById("spMain").innerHTML=`<img src="${anh(a[S.spAnh],1200)}" alt="${esc(m.ten)}">`;
   document.querySelectorAll(".thumbs-v button").forEach((b,i)=>b.setAttribute("aria-pressed",i===S.spAnh)); }
 
-/* ---------- Bán & ký gửi ---------- */
+/* ---------- Bán & ký gửi: 6 bước ----------
+   1 Món · 2 Ảnh · 3 AI đánh giá · 4 Thông tin · 5 Cách bán & phí · 6 Hợp đồng (CCCD + ký tay) */
 const CACH=[
  {k:"ban",ic:"cash",ten:"Ký gửi bán",ngan:"Nhận nhiều tiền nhất khi món bán được",nhan:"Nhận nhiều nhất"},
  {k:"bandut",ic:"clock",ten:"Bán đứt cho tiệm",ngan:"Nhận tiền trong 24 giờ sau khi tiệm kiểm đồ",nhan:"Nhận tiền nhanh nhất"},
  {k:"tindung",ic:"swap",ten:"Đổi tín dụng CHÉRIE",ngan:`Cao hơn bán đứt ${Math.round((TIN_DUNG-1)*100)}%, dùng thuê đầm, Office, Care, Seconde`,nhan:"Lợi nhất nếu bạn hay thuê đồ"},
  {k:"thue",ic:"rent",ten:"Ký gửi cho thuê",ngan:"Đầm vào kho cho thuê, bạn hưởng 50% mỗi lượt",nhan:"Thu nhập lặp lại"}];
-function veBan(){ const el=document.getElementById("smain"); if(el.dataset.p==="ban") return; el.dataset.p="ban"; const B=S.ban=Object.assign({dm:"tui",brand:"",giaMua:0,hang:"A",cach:"ban"},S.ban||{});
-  el.innerHTML=`<section class="band slim"><div class="max gut"><div class="eyebrow">Bán & ký gửi</div><h1>Bán đồ hiệu của bạn. Biết trước nhận bao nhiêu.</h1>
-    <p>Nhập món, xem 4 cách bán và số tiền ước tính ngay. Tiệm gửi offer chính thức qua Zalo trong 24 giờ làm việc sau khi xem ảnh.</p></div></section>
-  <div class="max gut sellgrid">
-   <form id="fBan" class="stack" style="gap:22px" novalidate>
-    <section class="card stack"><div class="stp"><span>1</span><h2>Món bạn muốn bán</h2></div>
-     <div class="g2"><label class="f">Danh mục<select id="bDM">${DM.map(([k,tx])=>`<option value="${k}" ${B.dm===k?"selected":""}>${tx}</option>`).join("")}</select></label>
-      <label class="f">Thương hiệu<input id="bBrand" list="dsBrandKH2" value="${esc(B.brand)}" placeholder="Chanel, Coach, SIXDO…" required></label>
-      <label class="f">Giá mua lúc đầu<input id="bGiaMua" inputmode="numeric" value="${B.giaMua?vnd(B.giaMua).replace("đ",""):""}" placeholder="5.000.000" required></label>
-      <label class="f">Tên món, mẫu, size<input id="bLoai" placeholder="Túi Tabby 26, đầm lụa size S…"></label></div>
-     <datalist id="dsBrandKH2">${LUX.concat(CAOCAP).filter(x=>x.length>3).map(x=>`<option value="${esc(x.replace(/\b\w/g,c=>c.toUpperCase()))}">`).join("")}</datalist>
-     <div class="f">Tình trạng<div class="choose3">${Object.entries(HANG).map(([k,h])=>`<button type="button" data-a="bHang" data-v="${k}" aria-pressed="${B.hang===k}"><b>${h.ten}</b><span>${h.mo}</span></button>`).join("")}</div></div></section>
-    <section class="card stack"><div class="stp"><span>2</span><h2>Chọn cách bán</h2></div><div id="bOffers" class="offers"></div><p class="small muted" id="bNote" style="margin:0"></p></section>
-    <section class="card stack"><div class="stp"><span>3</span><h2>Gửi để nhận offer chính thức</h2></div>
-     <div class="g2"><label class="f">Tên của bạn<input id="bTen" autocomplete="name" required></label><label class="f">Số Zalo<input id="bSdt" inputmode="tel" autocomplete="tel" required></label>
-      <label class="f">Bằng chứng mua<select id="bBC"><option>Hóa đơn</option><option>Còn tag</option><option>Ảnh đơn hàng online</option><option>Chưa có</option></select></label>
-      <label class="f" id="bSanW">Giá thấp nhất bạn đồng ý bán (giá sàn)<input id="bSan" inputmode="numeric" placeholder="Không bắt buộc"></label></div>
-     <label class="f">Ghi chú thêm (năm mua, số lần dùng, phụ kiện kèm theo)<textarea id="bMoTa"></textarea></label>
-     <input id="bWeb2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0">
-     <div class="row"><button class="btn wine" type="submit" id="bGui">Gửi và nhận offer</button><span class="small muted">Sau khi gửi, bạn gửi 3–5 ảnh qua Zalo ${ZALO}.</span></div></section>
-   </form>
-   <aside class="stack sellside">
-    <div class="card stack"><h3>Phí ký gửi</h3><div class="tiers num"><div><span>Món dưới 500.000đ</span><b>30%</b></div><div><span>500.000đ – 10.000.000đ</span><b>25%</b></div><div><span>Trên 10.000.000đ</span><b>20%</b></div><div><span>Luxury giá trị cao</span><b>Thỏa thuận</b></div></div></div>
-    <div class="card stack"><h3>Lịch giá khi ký gửi</h3><div class="tiers"><div><span>Giữ đồ tối đa</span><b>${HAN_NGAY} ngày</b></div><div><span>Từ ngày 30</span><b>Giảm 20%</b></div><div><span>Từ ngày 45</span><b>Giảm 35%</b></div><div><span>Không thấp hơn</span><b>Giá sàn của bạn</b></div></div></div>
-    <div class="card stack"><h3>Tiệm nhận gì</h3><p class="small" style="margin:0">Đầm, đồ công sở, túi, giày, phụ kiện còn tốt, có hóa đơn, tag hoặc bằng chứng mua. Hàng không rõ nguồn gốc hoặc hàng giả bị từ chối và trả lại.</p>
-     <p class="small" style="margin:0">Mỗi món được giặt hấp và kiểm tại xưởng CHÉRIE Care trước khi lên kệ.</p></div>
-    <a class="card linkcard" href="#tra-cuu"><b>Đã gửi đồ rồi?</b><span class="small muted">Tra cứu tình trạng và tiền ký gửi →</span></a></aside></div>`;
-  const nhap=()=>{ B.dm=val("bDM"); B.brand=val("bBrand").trim(); B.giaMua=tien(val("bGiaMua")); B.loai=val("bLoai").trim(); veOffer(); };
-  ["bDM","bBrand","bGiaMua","bLoai"].forEach(i=>document.getElementById(i).addEventListener("input",nhap));
-  document.getElementById("bGiaMua").addEventListener("blur",e=>{ const g=tien(e.target.value); e.target.value=g?vnd(g).replace("đ",""):""; });
-  document.getElementById("fBan").addEventListener("submit",guiBan); veOffer(); }
-function tinhOffer(B){ const u=uocTinh({brand:B.brand,giaMua:B.giaMua,hang:B.hang}), r=tyLeHH(u.giua);
-  const md=tron(u.giua*MUA_DUT[u.pk]), cho=["dam","congso"].includes(B.dm);
+const BUOC=["Món","Ảnh","AI đánh giá","Thông tin","Cách bán","Hợp đồng"];
+const PHU_KIEN=["Hộp","Túi chống bụi","Thẻ hoặc chứng nhận","Hóa đơn","Dây đeo, khóa, chìa"];
+const ANH_GOI_Y=["Toàn món, mặt trước","Mặt sau hoặc đáy","Logo và tem, mã sản xuất bên trong","Chỗ hao mòn: góc, quai, đế"];
+function banMoi(){ let p=""; try{ p=sessionStorage.getItem("sc-phien")||""; }catch(e){} if(!p){ p=Date.now().toString(36)+Math.random().toString(36).slice(2,10); try{ sessionStorage.setItem("sc-phien",p); }catch(e){} }
+  return {buoc:1,dm:"tui",brand:"",giaMua:0,phien:p,anh:[],hdAnh:[],ai:null,aiTT:"",hang:"",model:"",size:"",mau:"",namMua:"",phuKien:[],bangChung:"Hóa đơn",ghiChu:"",cach:"ban",giaSan:0,
+    hd:{hoTen:"",ngaySinh:"",cccd:"",diaChi:"",sdt:"",nganHang:"",soTK:"",chuTK:""},cccdT:null,cccdS:null,ky:"",dong:[false,false,false,false]}; }
+function veBan(){ const el=document.getElementById("smain"); if(el.dataset.p==="ban") return; el.dataset.p="ban"; S.ban=Object.assign(banMoi(),S.ban||{});
+  el.innerHTML=`<div class="max gut sect banwrap"><div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button><span class="crumb">Bán & ký gửi</span></div>
+   <h1>Bán đồ hiệu của bạn</h1><p class="muted" style="margin:4px 0 14px">Nhận báo giá, để AI xem ảnh sơ bộ, chọn cách bán và ký hợp đồng ngay trên điện thoại.</p>
+   <ol class="stepper" id="bSteps"></ol><div class="sellgrid"><div id="bStep" class="stack" style="gap:16px"></div>
+   <aside class="stack sellside" id="bSide"></aside></div></div>`;
+  veBuoc(); }
+function veBuoc(){ const B=S.ban; document.getElementById("bSteps").innerHTML=BUOC.map((t,i)=>`<li class="${i+1<B.buoc?"xong":i+1===B.buoc?"dang":""}"><span>${i+1}</span><b>${t}</b></li>`).join("");
+  const box=document.getElementById("bStep"); box.innerHTML=[null,b1,b2,b3,b4,b5,b6][B.buoc](B); ganBuoc(B); veSide(B); }
+function nav(lui){ const B=S.ban; return `<div class="row navrow">${B.buoc>1?`<button type="button" class="btn line" data-a="bLui">Quay lại</button>`:"<span></span>"}${lui||""}</div>`; }
+function uocNow(B){ return uocTinh({brand:B.brand,giaMua:B.giaMua,hang:B.hang||"B"}); }
+function veSide(B){ const s=document.getElementById("bSide"); if(!s) return; const u=B.giaMua?uocNow(B):null, o=u?tinhOffer(B):null, ca=CACH.find(c=>c.k===B.cach);
+  s.innerHTML=`<div class="card stack"><h3>Tóm tắt</h3><div class="tiers">
+   <div><span>Món</span><b>${esc([B.brand,tenDM(B.dm)].filter(Boolean).join(" · ")||"—")}</b></div>
+   <div><span>Giá mua</span><b class="num">${B.giaMua?vnd(B.giaMua):"—"}</b></div>
+   <div><span>Tình trạng</span><b>${B.hang?HANG[B.hang].ten:"chờ đánh giá"}</b></div>
+   ${u?`<div><span>Giá bán lại dự kiến</span><b class="num">${vnd(u.thap)} – ${vnd(u.cao)}</b></div>`:""}
+   ${B.buoc>=5&&o?`<div><span>${esc(ca.ten)}</span><b class="num">${esc(tienCach(o)[B.cach])}</b></div>`:""}
+   <div><span>Ảnh đã gửi</span><b class="num">${B.anh.filter(a=>a.id).length}</b></div></div>
+   <p class="small muted" style="margin:0">Số tiền là ước tính. Giá chính thức chốt sau khi tiệm kiểm món trực tiếp.</p></div>
+  <div class="card stack"><h3>Phí ký gửi</h3><div class="tiers num"><div><span>Dưới 500.000đ</span><b>30%</b></div><div><span>500.000đ – 10.000.000đ</span><b>25%</b></div><div><span>Trên 10.000.000đ</span><b>20%</b></div></div></div>
+  <a class="card linkcard" href="#tra-cuu"><b>Đã gửi đồ rồi?</b><span class="small muted">Tra cứu tình trạng và tiền ký gửi →</span></a>`; }
+function tienCach(o){ return {ban:`${vnd(o.ban[0])} – ${vnd(o.ban[1])}`,bandut:vnd(o.bandut),tindung:vnd(o.tindung),thue:o.thue?`${vnd(o.thue[0])} – ${vnd(o.thue[1])} / lượt`:"Chỉ nhận đầm, đồ công sở"}; }
+function tinhOffer(B){ const u=uocNow(B), r=tyLeHH(u.giua); const md=tron(u.giua*MUA_DUT[u.pk]), cho=["dam","congso"].includes(B.dm);
   return {u,r,ban:[tron(u.thap*(1-tyLeHH(u.thap))),tron(u.cao*(1-tyLeHH(u.cao)))],bandut:md,tindung:tron(md*TIN_DUNG),thue:cho?[tron(GIA_THUE[0]*CHIA_THUE),tron(GIA_THUE[1]*CHIA_THUE)]:null}; }
-function veOffer(){ const B=S.ban, box=document.getElementById("bOffers"); if(!box) return;
-  if(!B.giaMua){ box.innerHTML=`<div class="empty slim">Nhập thương hiệu và giá mua lúc đầu để xem bạn nhận được bao nhiêu.</div>`; document.getElementById("bNote").textContent=""; return; }
-  const o=tinhOffer(B); if(B.cach==="thue"&&!o.thue) B.cach="ban";
-  const tienCach={ban:`${vnd(o.ban[0])} – ${vnd(o.ban[1])}`,bandut:vnd(o.bandut),tindung:vnd(o.tindung),thue:o.thue?`${vnd(o.thue[0])} – ${vnd(o.thue[1])} / lượt`:"Chỉ nhận đầm, đồ công sở"};
+const BRAND_OPTS=()=>`<datalist id="dsHang">${BRANDS.map(b=>`<option value="${esc(b)}">`).join("")}</datalist>`;
+
+/* 1. Món */
+function b1(B){ const u=B.giaMua?uocNow(B):null;
+  return `<section class="card stack"><h2>Món bạn muốn bán</h2>
+   <div class="g2"><label class="f">Danh mục<select id="bDM">${DM.map(([k,tx])=>`<option value="${k}" ${B.dm===k?"selected":""}>${tx}</option>`).join("")}</select></label>
+    <label class="f">Thương hiệu<input id="bBrand" list="dsHang" value="${esc(B.brand)}" placeholder="Chanel, Coach, SIXDO…" autocomplete="off"></label>
+    <label class="f">Giá mua lúc đầu (đ)<input id="bGiaMua" class="money" inputmode="numeric" value="${B.giaMua?soDep(B.giaMua):""}" placeholder="20.000.000"></label></div>${BRAND_OPTS()}
+   <div id="bUoc">${u?`<div class="estim"><span class="small muted">${PK[u.pk].ten} · giá bán lại dự kiến</span><b class="num">${vnd(u.thap)} – ${vnd(u.cao)}</b><span class="small muted">Chính xác hơn sau khi gửi ảnh và AI đánh giá tình trạng.</span></div>`:`<div class="empty slim">Nhập thương hiệu và giá mua để xem giá bán lại dự kiến.</div>`}</div>
+   ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${B.brand&&B.giaMua?"":"disabled"}>Tiếp: gửi ảnh</button>`)}</section>`; }
+/* 2. Ảnh */
+function b2(B){ const ok=B.anh.filter(a=>a.id).length;
+  return `<section class="card stack"><h2>Gửi ảnh món đồ</h2><p class="small muted" style="margin:0">Chụp rõ, đủ sáng, nền trơn. Cần ít nhất 3 ảnh, tối đa 8. Ảnh chỉ tiệm xem được.</p>
+   <ul class="shots">${ANH_GOI_Y.map((t,i)=>`<li class="${ok>i?"ok":""}">${esc(t)}</li>`).join("")}</ul>
+   <div class="thumbs" id="bThumbs">${B.anh.map((a,i)=>`<div class="t"><div class="ph"><img src="${a.url}" alt="Ảnh ${i+1}">${a.id?"":`<span class="upl">${a.loi?"Lỗi":"Đang tải…"}</span>`}</div><button type="button" data-a="bBoAnh" data-v="${i}" aria-label="Bỏ ảnh">×</button></div>`).join("")}</div>
+   ${B.anh.length<8?`<label class="drop">${ico("plus2")}<b>Chụp hoặc chọn ảnh</b><span class="small muted">JPG, PNG · tự nén trước khi gửi</span><input type="file" id="bFile" accept="image/*" multiple></label>`:""}
+   ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${ok>=3&&B.anh.every(a=>a.id||a.loi)?"":"disabled"}>Tiếp: AI đánh giá</button>`)}</section>`; }
+/* 3. AI */
+const RUI={thap:["ok","Rủi ro thấp"],trungbinh:["warn","Cần kiểm thêm"],cao:["bad","Rủi ro cao"],khongro:["","Chưa đủ ảnh để nhận định"]};
+function b3(B){ const a=B.ai;
+  let body;
+  if(B.aiTT==="dang") body=`<div class="aiwait"><span class="spin"></span><div><b>AI đang xem ${B.anh.filter(x=>x.id).length} ảnh…</b><div class="small muted">Thường mất 10–30 giây.</div></div></div>`;
+  else if(B.aiTT==="khong") body=`<div class="banner">AI đánh giá đang tạm tắt. Bạn tự chọn tình trạng ở bước sau, tiệm sẽ xem ảnh và báo lại trong 24 giờ làm việc.</div>`;
+  else if(B.aiTT==="loi") body=`<div class="banner bad">Chưa đánh giá được. ${esc(B.aiLoi||"")}</div><button type="button" class="btn line" data-a="bAI">Thử lại</button>`;
+  else if(a){ const r=RUI[a.ruiRo]||RUI.khongro;
+    body=`<div class="aigrid">
+      <div class="aibox"><span class="small muted">Tình trạng</span><b>${a.hang&&HANG[a.hang]?HANG[a.hang].ten+" · "+HANG[a.hang].mo:"—"}</b>${a.doMoi?`<div class="meter"><span style="width:${Math.max(0,Math.min(100,a.doMoi))}%"></span></div><span class="small num">Độ mới khoảng ${a.doMoi}%</span>`:""}</div>
+      <div class="aibox"><span class="small muted">Năm sản xuất ước tính</span><b>${esc(a.namSanXuat||"Chưa xác định")}</b>${a.canCuNam?`<span class="small muted">${esc(a.canCuNam)}</span>`:""}</div>
+      <div class="aibox"><span class="small muted">Nguồn gốc (sơ bộ)</span><b><span class="pill ${r[0]}">${r[1]}</span></b>${(a.lyDo||[]).slice(0,4).map(x=>`<span class="small">• ${esc(x)}</span>`).join("")}</div>
+      ${(a.loi||[]).length?`<div class="aibox"><span class="small muted">Hao mòn thấy được</span>${a.loi.slice(0,5).map(x=>`<span class="small">• ${esc(x)}</span>`).join("")}</div>`:""}</div>
+     ${a.moTa?`<p class="small" style="margin:0">${esc(a.moTa)}</p>`:""}
+     ${(a.canThemAnh||[]).length?`<div class="banner info small">Nên chụp thêm: ${a.canThemAnh.map(esc).join(", ")}.</div>`:""}
+     <p class="small muted" style="margin:0">Đây là nhận định sơ bộ từ ảnh, chưa phải kiểm định. Tiệm kiểm định trực tiếp khi nhận đồ; món không đạt sẽ bị từ chối và trả lại.</p>
+     <div class="row"><button type="button" class="btn line sm" data-a="bAI">Đánh giá lại</button></div>`; }
+  else body=`<div class="empty slim">Bấm để AI xem ảnh và đánh giá sơ bộ.</div><button type="button" class="btn" data-a="bAI">Bắt đầu đánh giá</button>`;
+  return `<section class="card stack"><h2>AI đánh giá sơ bộ</h2><p class="small muted" style="margin:0">AI xem ảnh để ước tính độ mới, năm sản xuất, hao mòn và các dấu hiệu cần kiểm thêm về nguồn gốc.</p>${body}
+   ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${B.aiTT==="dang"?"disabled":""}>Tiếp: thông tin món</button>`)}</section>`; }
+/* 4. Thông tin */
+function b4(B){ const y=new Date().getFullYear(), nam=Array.from({length:25},(_,i)=>String(y-i));
+  return `<section class="card stack"><h2>Thông tin món</h2>${B.ai?`<p class="small muted" style="margin:0">Đã điền sẵn theo AI, bạn sửa lại nếu chưa đúng.</p>`:""}
+   <div class="g2"><label class="f">Tên mẫu<input id="iModel" value="${esc(B.model)}" placeholder="Classic Flap, Tabby 26, đầm lụa…"></label>
+    <label class="f">Size<input id="iSize" value="${esc(B.size)}" placeholder="S, 36, Medium…"></label>
+    <label class="f">Màu<input id="iMau" value="${esc(B.mau)}"></label>
+    <label class="f">Năm mua<select id="iNam"><option value="">Chọn năm</option>${nam.map(n=>`<option ${B.namMua===n?"selected":""}>${n}</option>`).join("")}<option value="truoc" ${B.namMua==="truoc"?"selected":""}>Trước ${y-24}</option></select></label></div>
+   <div class="f">Tình trạng${B.ai&&B.ai.hang?` <span class="small muted">· AI gợi ý ${HANG[B.ai.hang]?.ten||""}</span>`:""}<div class="choose3">${Object.entries(HANG).map(([k,h])=>`<button type="button" data-a="bHang" data-v="${k}" aria-pressed="${B.hang===k}"><b>${h.ten}</b><span>${h.mo}</span></button>`).join("")}</div></div>
+   <div class="f">Phụ kiện kèm theo<div class="checks">${PHU_KIEN.map(p=>`<label><input type="checkbox" data-pk="${esc(p)}" ${B.phuKien.includes(p)?"checked":""}>${esc(p)}</label>`).join("")}</div></div>
+   <div class="g2"><label class="f">Bằng chứng mua<select id="iBC">${["Hóa đơn","Còn tag","Ảnh đơn hàng online","Chưa có"].map(x=>`<option ${B.bangChung===x?"selected":""}>${x}</option>`).join("")}</select></label>
+    <div class="f">Ảnh hóa đơn (nếu có)<label class="drop slim">${B.hdAnh.length?`Đã gửi ${B.hdAnh.filter(a=>a.id).length} ảnh · thêm`:"Chọn ảnh hóa đơn"}<input type="file" id="iHD" accept="image/*" multiple></label></div></div>
+   <label class="f">Ghi chú (số lần dùng, lỗi đã biết)<textarea id="iGhi">${esc(B.ghiChu)}</textarea></label>
+   ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${B.hang?"":"disabled"}>Tiếp: chọn cách bán</button>`)}</section>`; }
+/* 5. Cách bán & phí */
+function b5(B){ const o=tinhOffer(B); if(B.cach==="thue"&&!o.thue) B.cach="ban"; const t=tienCach(o), r=o.r, g=o.u.giua;
   const khi={ban:"khi món bán được",bandut:"tiền mặt, 24 giờ sau khi kiểm",tindung:"tín dụng dùng trong hệ CHÉRIE",thue:"mỗi lượt thuê, trả trong 7 ngày"};
-  box.innerHTML=CACH.map(c=>`<button type="button" class="offer" data-a="bCach" data-v="${c.k}" aria-pressed="${B.cach===c.k}" ${c.k==="thue"&&!o.thue?"disabled":""}>
-     <span class="ohead">${ico(c.ic,"wico")}<span class="badge">${c.nhan}</span></span><b>${c.ten}</b><span class="amt num">${tienCach[c.k]}</span><span class="small muted">${khi[c.k]}</span><span class="small">${c.ngan}</span></button>`).join("");
-  const thap=o.u.giua<GIA_TOI_THIEU&&B.cach==="ban";
-  document.getElementById("bNote").innerHTML=`${PK[o.u.pk].ten}: giá bán lại dự kiến ${vnd(o.u.thap)} – ${vnd(o.u.cao)}${B.cach==="ban"?`, phí ký gửi ${Math.round(o.r*100)}%`:""}. Đây là ước tính, offer chính thức báo qua Zalo sau khi xem ảnh.${thap?` <b>Món dưới ${vnd(GIA_TOI_THIEU)} chưa nhận ký gửi bán, bạn có thể chọn bán đứt hoặc đổi tín dụng.</b>`:""}`;
-  const sw=document.getElementById("bSanW"); if(sw) sw.hidden=B.cach!=="ban"; }
-async function guiBan(ev){ ev.preventDefault(); const B=S.ban, so=sdt(val("bSdt")), ten=val("bTen").trim();
-  if(!B.brand||!B.giaMua){ toast("Nhập thương hiệu và giá mua ở bước 1."); document.getElementById("bBrand").focus(); return; }
-  if(!ten||so.length<9){ toast("Nhập tên và số Zalo."); return; }
-  const o=tinhOffer(B); if(B.cach==="ban"&&o.u.giua<GIA_TOI_THIEU){ toast("Món dưới "+vnd(GIA_TOI_THIEU)+" chưa nhận ký gửi bán. Chọn bán đứt hoặc đổi tín dụng."); return; }
-  const btn=document.getElementById("bGui"); btn.disabled=true;
-  try{ const kq=await S.db.collection("dangky").add({ten,sdt:so,brand:B.brand,loai:B.loai||tenDM(B.dm),danhMuc:B.dm,phanKhuc:o.u.pk,hangKhach:B.hang,giaMua:B.giaMua,giaMuon:0,giaSan:B.cach==="ban"?tien(val("bSan")):0,uocTinh:o.u.giua,
-      hinh:B.cach,bangChung:val("bBC"),moTa:val("bMoTa").trim(),web2:val("bWeb2"),ngay:homNay(),gio:gioNay(),tt:"moi"});
-    const ma=kq&&kq.id, ca=CACH.find(c=>c.k===B.cach);
-    openSheet(`<div class="row"><h2>Đã nhận yêu cầu</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
-     <div class="banner ok">Mã của bạn: <b class="num" style="user-select:all">${esc(ma||"")}</b> · ${esc(ca.ten)}. Giữ mã này để tra cứu.</div>
-     <ol class="small" style="margin:0;padding-left:18px"><li>Gửi 3–5 ảnh rõ (toàn món, logo/tag, chỗ hao mòn, hóa đơn) qua Zalo ${ZALO}, ghi mã ${esc(ma||"")}.</li><li>Tiệm báo offer chính thức trong 24 giờ làm việc.</li><li>Bạn đồng ý thì hẹn giao đồ: tận nơi ở Đà Nẵng thứ 2, thứ 6 hoặc gửi xe toàn quốc.</li></ol>
-     <div class="row"><a class="btn wine" href="https://zalo.me/${ZALO}" target="_blank" rel="noopener">Mở Zalo gửi ảnh</a><button class="btn line" data-a="dong">Xong</button></div>`);
-    ["bTen","bSdt","bSan","bMoTa"].forEach(i=>document.getElementById(i).value="");
-  }catch(e){ loiGhi(e); } btn.disabled=false; }
+  const thap=g<GIA_TOI_THIEU&&B.cach==="ban";
+  const chiTiet={ban:[["Phí ký gửi",`${Math.round(r*100)}% giá bán`],["Thời hạn",`${HAN_NGAY} ngày`],["Giảm giá tự động","20% từ ngày 30, 35% từ ngày 45, không thấp hơn giá sàn"],["Nhận tiền","3 ngày làm việc sau khi hết hạn đổi trả 3 ngày"],["Hết hạn chưa bán","Giảm tiếp theo thỏa thuận hoặc nhận lại đồ"]],
+    bandut:[["Giá dự kiến",vnd(o.bandut)],["Giá chính thức","Sau khi tiệm kiểm món, offer giữ 7 ngày"],["Nhận tiền","Chuyển khoản trong 24 giờ sau khi kiểm"],["Phí","Không"]],
+    tindung:[["Tín dụng dự kiến",vnd(o.tindung)],["Dùng cho","Thuê đầm, CHÉRIE Office, Care, Seconde"],["Thời hạn dùng","12 tháng [GĐ]"],["Phí","Không"]],
+    thue:[["Chia tiền thuê","50% mỗi lượt cho bạn"],["Thời hạn","Tối thiểu 3 tháng [GĐ]"],["Nhận tiền","7 ngày sau mỗi lượt"],["Giặt hấp","Tiệm lo qua CHÉRIE Care"]]}[B.cach];
+  return `<section class="card stack"><h2>Chọn cách bán</h2><div class="offers">${CACH.map(c=>`<button type="button" class="offer" data-a="bCach" data-v="${c.k}" aria-pressed="${B.cach===c.k}" ${c.k==="thue"&&!o.thue?"disabled":""}>
+     <span class="ohead">${ico(c.ic,"wico")}<span class="badge">${c.nhan}</span></span><b>${c.ten}</b><span class="amt num">${t[c.k]}</span><span class="small muted">${khi[c.k]}</span></button>`).join("")}</div>
+   ${thap?`<div class="banner bad">Món dưới ${vnd(GIA_TOI_THIEU)} chưa nhận ký gửi bán. Chọn bán đứt hoặc đổi tín dụng.</div>`:""}
+   <div class="card inner stack" style="gap:6px"><b>Phí và thời gian · ${esc(CACH.find(c=>c.k===B.cach).ten)}</b><div class="tiers">${chiTiet.map(([a,b])=>`<div><span>${a}</span><b>${b}</b></div>`).join("")}</div>
+    ${B.cach==="ban"?`<label class="f">Giá thấp nhất bạn đồng ý bán (giá sàn, không bắt buộc)<input id="iSan" class="money" inputmode="numeric" value="${B.giaSan?soDep(B.giaSan):""}"></label>`:""}</div>
+   ${nav(`<button type="button" class="btn wine" data-a="bTiep" ${thap?"disabled":""}>Tiếp: hợp đồng</button>`)}</section>`; }
+/* 6. Hợp đồng */
+function b6(B){ const h=B.hd, canTK=B.cach!=="tindung";
+  return `<section class="card stack"><h2>Thông tin người ký gửi</h2><p class="small muted" style="margin:0">Dùng để lập hợp đồng và xác minh chủ sở hữu. Số CCCD, ảnh CCCD và số tài khoản chỉ chủ tiệm xem được, không hiện trên web.</p>
+   <div class="g2"><label class="f">Họ và tên (như trên CCCD)<input id="hTen" value="${esc(h.hoTen)}" autocomplete="name"></label>
+    <label class="f">Ngày sinh<input id="hNS" type="date" value="${esc(h.ngaySinh)}"></label>
+    <label class="f">Số CCCD (12 số)<input id="hCC" inputmode="numeric" data-plain maxlength="12" value="${esc(h.cccd)}" autocomplete="off"></label>
+    <label class="f">Số Zalo<input id="hSdt" inputmode="tel" value="${esc(h.sdt)}" autocomplete="tel"></label></div>
+   <label class="f">Địa chỉ thường trú<input id="hDC" value="${esc(h.diaChi)}" autocomplete="street-address"></label>
+   <p class="small muted" style="margin:0">${canAnhCCCD(B)?"Món giá trị từ 10 triệu: cần ảnh CCCD 2 mặt để xác minh chủ sở hữu.":"Ảnh CCCD không bắt buộc với món dưới 10 triệu. Tiệm sẽ đối chiếu CCCD khi nhận đồ."}</p>
+   <div class="g2"><div class="f">Ảnh CCCD mặt trước${canAnhCCCD(B)?"":" (không bắt buộc)"}<label class="drop slim ${B.cccdT?"done":""}">${B.cccdT?(B.cccdT.id?"Đã gửi · chọn lại":"Đang tải…"):"Chụp mặt trước"}<input type="file" id="hCCT" accept="image/*"></label></div>
+    <div class="f">Ảnh CCCD mặt sau${canAnhCCCD(B)?"":" (không bắt buộc)"}<label class="drop slim ${B.cccdS?"done":""}">${B.cccdS?(B.cccdS.id?"Đã gửi · chọn lại":"Đang tải…"):"Chụp mặt sau"}<input type="file" id="hCCS" accept="image/*"></label></div></div>
+   ${canTK?`<div class="g2"><label class="f">Ngân hàng nhận tiền<input id="hNH" value="${esc(h.nganHang)}" placeholder="Vietcombank, MB…"></label><label class="f">Số tài khoản<input id="hTK" inputmode="numeric" data-plain value="${esc(h.soTK)}" autocomplete="off"></label><label class="f">Chủ tài khoản<input id="hCTK" value="${esc(h.chuTK)}"></label></div>`:""}
+  </section>
+  <section class="card stack"><h2>Hợp đồng ký gửi</h2><div class="hdbox" id="hdText">${vanBanHD(B,true)}</div>
+   <label class="cbx"><input type="checkbox" data-dong="0" ${B.dong[0]?"checked":""}><span>Tôi đã đọc và đồng ý toàn bộ điều khoản hợp đồng.</span></label>
+   <label class="cbx"><input type="checkbox" data-dong="1" ${B.dong[1]?"checked":""}><span>Tôi cam đoan món đồ là <b>hàng thật</b>, thuộc sở hữu hợp pháp của tôi, và tôi <b>chịu hoàn toàn trách nhiệm</b> nếu món đồ là hàng giả, hàng nhái hoặc có tranh chấp.</span></label>
+   <label class="cbx"><input type="checkbox" data-dong="2" ${B.dong[2]?"checked":""}><span>Tôi đồng ý cho CHÉRIE Seconde xử lý số CCCD, số tài khoản và thông tin trên của tôi để lập, thực hiện hợp đồng theo Điều 9.</span></label>
+   ${B.cccdT||B.cccdS||canAnhCCCD(B)?`<label class="cbx"><input type="checkbox" data-dong="3" ${B.dong[3]?"checked":""}><span>Tôi đồng ý riêng cho CHÉRIE Seconde xử lý <b>ảnh CCCD</b> (dữ liệu cá nhân nhạy cảm) để xác minh chủ sở hữu theo Điều 9 (b).</span></label>`:""}
+   <div class="f">Chữ ký<div class="kywrap"><canvas id="hKy" width="600" height="180" aria-label="Khung ký tên"></canvas><button type="button" class="btn sm line" data-a="kyLai">Ký lại</button></div><span class="small muted">Ký bằng ngón tay hoặc chuột.</span></div>
+   ${nav(`<button type="button" class="btn wine" data-a="bKy" id="bKyBtn">Ký và gửi hợp đồng</button>`)}</section>`; }
+/* Gắn sự kiện cho từng bước */
+function ganBuoc(B){ const g=id=>document.getElementById(id); const stp=g("bStep"); stp.oninput=null; stp.onchange=null;
+  if(B.buoc===1){ const nhap=()=>{ B.dm=g("bDM").value; B.brand=g("bBrand").value.trim(); B.giaMua=tien(g("bGiaMua").value);
+      const u=B.giaMua?uocNow(B):null; g("bUoc").innerHTML=u?`<div class="estim"><span class="small muted">${PK[u.pk].ten} · giá bán lại dự kiến</span><b class="num">${vnd(u.thap)} – ${vnd(u.cao)}</b><span class="small muted">Chính xác hơn sau khi gửi ảnh và AI đánh giá tình trạng.</span></div>`:`<div class="empty slim">Nhập thương hiệu và giá mua để xem giá bán lại dự kiến.</div>`;
+      document.querySelector('[data-a="bTiep"]').disabled=!(B.brand&&B.giaMua); veSide(B); };
+    ["bDM","bBrand","bGiaMua"].forEach(i=>g(i).addEventListener("input",nhap)); }
+  if(B.buoc===2){ const f=g("bFile"); if(f) f.onchange=async()=>{ const ds=[...f.files].slice(0,8-B.anh.length); f.value=""; await taiAnh(ds,"sp",B.anh); }; }
+  if(B.buoc===3&&!B.ai&&!B.aiTT) chayAI();
+  if(B.buoc===4){ const luu=()=>{ B.model=g("iModel").value.trim(); B.size=g("iSize").value.trim(); B.mau=g("iMau").value.trim(); B.namMua=g("iNam").value; B.bangChung=g("iBC").value; B.ghiChu=g("iGhi").value.trim();
+      B.phuKien=[...document.querySelectorAll("[data-pk]")].filter(x=>x.checked).map(x=>x.dataset.pk); };
+    const sec4=document.querySelector("#bStep > section"); sec4.addEventListener("input",luu); sec4.addEventListener("change",luu);
+    const h=g("iHD"); h.onchange=async()=>{ const ds=[...h.files].slice(0,3); h.value=""; luu(); await taiAnh(ds,"hd",B.hdAnh); }; }
+  if(B.buoc===5){ const s=g("iSan"); if(s) s.addEventListener("input",()=>{ B.giaSan=tien(s.value); }); }
+  if(B.buoc===6){ const luu=()=>{ const h=B.hd; h.hoTen=g("hTen").value.trim(); h.ngaySinh=g("hNS").value; h.cccd=g("hCC").value.replace(/\D/g,""); h.sdt=g("hSdt").value.trim(); h.diaChi=g("hDC").value.trim();
+      if(g("hNH")){ h.nganHang=g("hNH").value.trim(); h.soTK=g("hTK").value.replace(/\s/g,""); h.chuTK=g("hCTK").value.trim(); }
+      document.querySelectorAll("[data-dong]").forEach(x=>B.dong[Number(x.dataset.dong)]=x.checked); g("hdText").innerHTML=vanBanHD(B,true); };
+    const st=document.getElementById("bStep"); st.oninput=e=>{ if(e.target.closest("#hKy")) return; luu(); }; st.onchange=luu;
+    g("hCCT").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; B.cccdT={}; veBuoc(); B.cccdT=await taiMot(f,"cccd"); veBuoc(); };
+    g("hCCS").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; B.cccdS={}; veBuoc(); B.cccdS=await taiMot(f,"cccd"); veBuoc(); };
+    kyCanvas(g("hKy")); } }
+async function taiMot(f,loai){ try{ const bl=await nenAnh(f); const data=await new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=no; r.readAsDataURL(bl); });
+    const r=await SC.call("upAnhKH",{data,phien:S.ban.phien,loai}); return {id:r.id}; }catch(e){ toast(e.message||"Chưa gửi được ảnh, thử lại."); return null; } }
+async function taiAnh(files,loai,arr){ for(const f of files){ const o={url:URL.createObjectURL(f),id:"",loi:false}; arr.push(o); }
+  veBuoc(); const moi=arr.slice(-files.length);
+  await Promise.all(moi.map(async(o,i)=>{ const r=await taiMot(files[i],loai); if(r&&r.id) o.id=r.id; else o.loi=true; }));
+  for(let i=arr.length-1;i>=0;i--) if(arr[i].loi) arr.splice(i,1);
+  if(S.ban.buoc===2||S.ban.buoc===4) veBuoc(); }
+async function chayAI(){ const B=S.ban; B.aiTT="dang"; veBuoc();
+  try{ const r=await SC.call("aiDanhGia",{phien:B.phien,ids:B.anh.filter(a=>a.id).map(a=>a.id),brand:B.brand,danhMuc:tenDM(B.dm),giaMua:B.giaMua});
+    if(r.khongCo){ B.aiTT="khong"; } else { B.ai=r.ai; B.aiTT="";
+      const a=r.ai; if(a.hang&&HANG[a.hang]&&!B.hang) B.hang=a.hang; if(a.model&&!B.model) B.model=a.model; if(a.mau&&!B.mau) B.mau=a.mau; if(a.size&&!B.size) B.size=a.size; }
+  }catch(e){ B.aiTT="loi"; B.aiLoi=e.message; }
+  if(S.ban.buoc===3) veBuoc(); }
+function kyCanvas(c){ const ctx=c.getContext("2d"); const ve=()=>{ ctx.clearRect(0,0,c.width,c.height); if(S.ban.ky){ const im=new Image(); im.onload=()=>ctx.drawImage(im,0,0); im.src=S.ban.ky; } }; ve();
+  ctx.lineWidth=3; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#1B1618"; let ve2=false, coNet=false;
+  const p=e=>{ const r=c.getBoundingClientRect(); return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]; };
+  c.addEventListener("pointerdown",e=>{ ve2=true; coNet=true; c.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...p(e)); e.preventDefault(); });
+  c.addEventListener("pointermove",e=>{ if(!ve2) return; ctx.lineTo(...p(e)); ctx.stroke(); e.preventDefault(); });
+  const het=()=>{ if(!ve2) return; ve2=false; if(coNet) S.ban.ky=c.toDataURL("image/png"); };
+  c.addEventListener("pointerup",het); c.addEventListener("pointercancel",het); }
+async function guiHopDong(btn){ const B=S.ban, h=B.hd;
+  const thieu=[]; if(h.hoTen.length<4) thieu.push("họ tên"); if(!/^\d{12}$/.test(h.cccd)) thieu.push("số CCCD 12 số"); if(sdt(h.sdt).length<9) thieu.push("số Zalo"); if(!h.diaChi) thieu.push("địa chỉ");
+  const coAnh=!!((B.cccdT&&B.cccdT.id)||(B.cccdS&&B.cccdS.id)); if(canAnhCCCD(B)&&!((B.cccdT&&B.cccdT.id)&&(B.cccdS&&B.cccdS.id))) thieu.push("ảnh CCCD 2 mặt"); if(B.cach!=="tindung"&&(!h.nganHang||!h.soTK)) thieu.push("tài khoản nhận tiền");
+  if(!B.dong.slice(0,3).every(Boolean)) thieu.push("3 ô đồng ý"); if(coAnh&&!B.dong[3]) thieu.push("ô đồng ý xử lý ảnh CCCD"); if(!B.ky) thieu.push("chữ ký");
+  if(thieu.length){ toast("Còn thiếu: "+thieu.join(", ")+"."); return; }
+  btn.disabled=true; btn.textContent="Đang gửi…";
+  try{ const o=tinhOffer(B);
+    const r=await SC.call("kyHopDong",{phien:B.phien,dm:B.dm,danhMuc:B.dm,phanKhuc:o.u.pk,brand:B.brand,giaMua:B.giaMua,model:B.model,size:B.size,mau:B.mau,namMua:B.namMua,hang:B.hang,phuKien:B.phuKien,bangChung:B.bangChung,ghiChu:B.ghiChu,
+      cach:B.cach,giaSan:B.cach==="ban"?B.giaSan:0,uocTinh:o.u.giua,anh:B.anh.filter(a=>a.id).map(a=>a.id),hdAnh:B.hdAnh.filter(a=>a.id).map(a=>a.id),ai:B.ai,
+      hd:h,cccdT:B.cccdT&&B.cccdT.id||"",cccdS:B.cccdS&&B.cccdS.id||"",dongAnh:!!B.dong[3],ky:B.ky,vanBan:vanBanHD(B,false),phienBan:HD_PHIEN_BAN,ua:navigator.userAgent.slice(0,200)});
+    const ca=CACH.find(c=>c.k===B.cach);
+    document.getElementById("bStep").innerHTML=`<section class="card stack"><h2>Đã ký hợp đồng</h2>
+     <div class="banner ok">Mã yêu cầu <b class="num" style="user-select:all">${esc(r.id)}</b> · Hợp đồng <b class="num" style="user-select:all">${esc(r.maHD)}</b> · ${esc(ca.ten)}</div>
+     <ol class="small" style="margin:0;padding-left:18px"><li>Tiệm xem ảnh và báo offer chính thức qua Zalo trong 24 giờ làm việc.</li><li>Bạn đồng ý thì hẹn giao đồ: tận nơi ở Đà Nẵng thứ 2, thứ 6 hoặc gửi xe toàn quốc.</li><li>Tiệm kiểm định trực tiếp. Món đạt thì lên kệ hoặc nhận tiền theo cách bạn đã chọn.</li></ol>
+     <p class="small muted" style="margin:0">Mã xác thực nội dung hợp đồng: <span class="num">${esc(String(r.hash||"").slice(0,16))}</span>. Tiệm gửi bản hợp đồng qua Zalo khi bạn cần.</p>
+     <div class="row"><a class="btn wine" href="https://zalo.me/${ZALO}" target="_blank" rel="noopener">Nhắn Zalo tiệm</a><a class="btn line" href="#tra-cuu">Tra cứu</a></div></section>`;
+    document.getElementById("bSteps").querySelectorAll("li").forEach(li=>li.className="xong");
+    try{ sessionStorage.removeItem("sc-phien"); }catch(e){} S.ban=null;
+  }catch(e){ toast(e.message||"Chưa gửi được, thử lại."); btn.disabled=false; btn.textContent="Ký và gửi hợp đồng"; } }
+function kiemBuoc(B){ if(B.buoc===1) return B.brand&&B.giaMua; if(B.buoc===2) return B.anh.filter(a=>a.id).length>=3; if(B.buoc===4) return !!B.hang; if(B.buoc===5) return !(tinhOffer(B).u.giua<GIA_TOI_THIEU&&B.cach==="ban"); return true; }
+/* ---------- Hợp đồng ký gửi (bản 2026-11-02) ---------- */
+const HD_PHIEN_BAN="2026-11-02b";
+const NGUONG_ANH_CCCD=10000000; /* [GĐ] chỉ bắt buộc ảnh CCCD với món giá bán dự kiến từ 10 triệu */
+function canAnhCCCD(B){ return uocNow(B).giua>=NGUONG_ANH_CCCD; }
+const BEN_B={ten:"Hộ kinh doanh CHÉRIE (thương hiệu CHÉRIE Seconde)",daiDien:"Lê Nguyễn Hồng Phúc",diaChi:"[GĐ: địa chỉ đăng ký hộ kinh doanh], Đà Nẵng",dkkd:"[GĐ: số đăng ký hộ kinh doanh]",lienHe:"Zalo 0377 159 189 · hello@cherie.io.vn"};
+function vanBanHD(B,html){ const h=B.hd, o=tinhOffer(B), ca=CACH.find(c=>c.k===B.cach), mua=B.cach==="bandut"||B.cach==="tindung", hom=ngVN(homNay());
+  const e=s=>html?esc(s):String(s==null?"":s), trong=s=>s?e(s):(html?"<i>(chưa điền)</i>":"(chưa điền)");
+  const cc=h.cccd?(html?"••••••••"+e(h.cccd.slice(-4)):h.cccd):(html?"<i>(chưa điền)</i>":"(chưa điền)");
+  const dk=[
+   [mua?"THỎA THUẬN BÁN ĐỒ CHO CHÉRIE SECONDE":B.cach==="thue"?"HỢP ĐỒNG ỦY THÁC CHO THUÊ (KÝ GỬI CHO THUÊ)":"HỢP ĐỒNG ỦY THÁC BÁN HÀNG (KÝ GỬI)",null],
+   [null,`Ngày ${hom}, giao kết bằng phương tiện điện tử trên website 2hand.cherie.io.vn.`],
+   ["Bên A (Bên ký gửi)",`Họ tên: ${trong(h.hoTen)}. Ngày sinh: ${trong(h.ngaySinh?ngVN(h.ngaySinh):"")}. Số CCCD: ${cc}. Địa chỉ: ${trong(h.diaChi)}. Zalo: ${trong(h.sdt)}.`],
+   ["Bên B (Bên nhận ký gửi)",`${e(BEN_B.ten)}. Đại diện: ${e(BEN_B.daiDien)}. Địa chỉ: ${e(BEN_B.diaChi)}. Đăng ký kinh doanh: ${e(BEN_B.dkkd)}. Liên hệ: ${e(BEN_B.lienHe)}.`],
+   ["Điều 1. Hàng hóa",`${trong([B.brand,B.model].filter(Boolean).join(" "))}, danh mục ${e(tenDM(B.dm))}, size ${trong(B.size)}, màu ${trong(B.mau)}, năm mua ${trong(B.namMua==="truoc"?"trước "+(new Date().getFullYear()-24):B.namMua)}. Tình trạng Bên A tự khai: ${B.hang?e(HANG[B.hang].ten+" ("+HANG[B.hang].mo+")"):(html?"<i>(chưa chọn)</i>":"(chưa chọn)")}. Phụ kiện kèm: ${e(B.phuKien.join(", ")||"không")}. Bằng chứng mua: ${e(B.bangChung)}. Kèm ${B.anh.filter(a=>a.id).length} ảnh Bên A gửi qua website.`],
+   ["Điều 2. Hình thức",mua?`Bên A bán món đồ cho Bên B ${B.cach==="tindung"?"để đổi lấy tín dụng CHÉRIE":"lấy tiền"}. Quyền sở hữu chuyển cho Bên B khi Bên B xác nhận đạt kiểm định và ${B.cach==="tindung"?"cấp tín dụng":"thanh toán"} đủ.`
+     :B.cach==="thue"?`Bên A giao món đồ cho Bên B đưa vào kho cho thuê. Bên A vẫn là chủ sở hữu. Bên B nhân danh mình cho khách thuê và chia tiền thuê theo Điều 3.`
+     :`Bên A ủy thác cho Bên B bán món đồ theo Điều 155–165 Luật Thương mại 2005. Bên B nhân danh mình bán cho khách và hưởng thù lao (hoa hồng). Bên A vẫn là chủ sở hữu cho đến khi món đồ được bán.`],
+   ["Điều 3. Giá và phí",mua?`Giá dự kiến ${e(vnd(B.cach==="tindung"?o.tindung:o.bandut))}${B.cach==="tindung"?" tín dụng":""}. Giá chính thức do Bên B báo sau khi kiểm món trực tiếp, Bên A xác nhận qua Zalo; offer giữ 7 ngày. Không thu phí.`
+     :B.cach==="thue"?`Bên A hưởng 50% tiền thuê mỗi lượt. Giá thuê do Bên B định theo bảng giá Thuê đầm. Bên B chịu chi phí giặt hấp qua CHÉRIE Care.`
+     :`Giá đăng bán do Bên B đề xuất sau kiểm định và Bên A xác nhận qua Zalo. Giá bán lại dự kiến ${e(vnd(o.u.thap))} – ${e(vnd(o.u.cao))}. Hoa hồng Bên B: 30% với giá dưới 500.000đ, 25% từ 500.000đ đến 10.000.000đ, 20% trên 10.000.000đ, tính trên giá bán thực tế. Giá tự giảm 20% từ ngày thứ 30 và 35% từ ngày thứ 45, không thấp hơn giá sàn ${B.giaSan?e(vnd(B.giaSan)):"(không đặt)"}.`],
+   ["Điều 4. Thời hạn",mua?`Thỏa thuận có hiệu lực từ khi ký đến khi Bên B ${B.cach==="tindung"?"cấp tín dụng":"thanh toán"} hoặc Bên A từ chối giá chính thức.`
+     :`${B.cach==="thue"?"Tối thiểu 3 tháng [GĐ]":HAN_NGAY+" ngày"} kể từ ngày Bên B nhận đồ. Hết hạn chưa ${B.cach==="thue"?"muốn tiếp tục":"bán"}, hai bên thỏa thuận giảm giá tiếp hoặc Bên A nhận lại đồ trong 7 ngày; quá hạn, Bên B được tính phí lưu kho [GĐ: mức phí].`],
+   ["Điều 5. Thanh toán",B.cach==="tindung"?`Tín dụng ghi vào hồ sơ khách theo số Zalo của Bên A, dùng trong 12 tháng [GĐ] cho Thuê đầm, CHÉRIE Office, CHÉRIE Care và CHÉRIE Seconde; không quy đổi thành tiền mặt.`
+     :`Bên B chuyển khoản vào tài khoản ${trong(h.nganHang)} số ${h.soTK?(html?"••••"+e(h.soTK.slice(-4)):h.soTK):(html?"<i>(chưa điền)</i>":"(chưa điền)")} chủ tài khoản ${trong(h.chuTK)}${mua?" trong 24 giờ sau khi kiểm định đạt.":B.cach==="thue"?" trong 7 ngày sau mỗi lượt thuê.":" trong 3 ngày làm việc sau khi hết thời hạn đổi trả 3 ngày của người mua."}`],
+   ["Điều 6. Cam đoan của Bên A","Bên A cam đoan: (a) món đồ là hàng thật, đúng thương hiệu đã khai, không phải hàng giả, hàng nhái, hàng xâm phạm quyền sở hữu trí tuệ; (b) món đồ thuộc sở hữu hợp pháp của Bên A, không do trộm cắp, lừa đảo mà có, không bị tranh chấp, cầm cố; (c) thông tin và hình ảnh Bên A cung cấp là đúng và đầy đủ, kể cả lỗi đã biết."],
+   ["Điều 7. Kiểm định và hàng giả","(a) Bên B kiểm định món đồ khi nhận và có quyền từ chối món không đạt. Nhận định của AI trên website chỉ là sơ bộ, không thay cho kiểm định. (b) Nếu có căn cứ nghi ngờ món đồ là hàng giả hoặc có nguồn gốc bất hợp pháp, Bên B được tạm giữ món đồ, lập biên bản có ảnh, thông báo cho Bên A qua Zalo, và giao cho cơ quan quản lý thị trường hoặc công an khi pháp luật yêu cầu; khi đó Bên B không có nghĩa vụ trả lại món đồ cho Bên A. (c) Đối với người mua, Bên B là bên bán và tự chịu trách nhiệm theo pháp luật bảo vệ quyền lợi người tiêu dùng. Nếu món đồ đã bán bị xác định là hàng giả hoặc vi phạm Điều 6, Bên B hoàn tiền cho người mua trước. (d) Giữa hai bên, Bên A phải bồi hoàn cho Bên B toàn bộ số tiền Bên A đã nhận, mọi khoản Bên B đã trả cho người mua, tiền phạt, chi phí kiểm định, vận chuyển và thiệt hại khác phát sinh từ vi phạm Điều 6, trong 7 ngày kể từ khi Bên B thông báo; Bên B được khấu trừ vào các khoản đang phải trả cho Bên A. (e) Bên A chịu trách nhiệm trước pháp luật về nguồn gốc món đồ do mình cung cấp."],
+   ["Điều 8. Bảo quản và rủi ro","Bên B bảo quản món đồ trong thời gian giữ. Món đồ mất hoặc hư hỏng do lỗi của Bên B thì Bên B bồi thường theo giá sàn Bên A đã đặt, hoặc giá bán lại dự kiến nếu chưa đặt giá sàn. Bên B không chịu trách nhiệm về hao mòn tự nhiên và lỗi đã có trước khi nhận. Khi có khiếu nại của người mua, Bên B được tạm giữ khoản tiền liên quan đến khi giải quyết xong."],
+   ["Điều 9. Dữ liệu cá nhân","Theo Luật Bảo vệ dữ liệu cá nhân 2025: (a) Bên B xử lý họ tên, ngày sinh, số CCCD, địa chỉ, số Zalo, số tài khoản và chữ ký của Bên A để lập, thực hiện hợp đồng, thanh toán và xác minh chủ sở hữu. (b) Ảnh CCCD là dữ liệu cá nhân nhạy cảm; Bên B chỉ thu khi Bên A đồng ý riêng, chỉ dùng để xác minh chủ sở hữu món đồ giá trị cao và cung cấp cho cơ quan có thẩm quyền khi có yêu cầu hợp pháp. (c) Dữ liệu lưu riêng, chỉ chủ hộ kinh doanh truy cập, giữ 5 năm sau khi hợp đồng kết thúc [GĐ] rồi xóa. (d) Bên A có quyền xem, sửa, rút lại đồng ý và yêu cầu xóa dữ liệu qua Zalo hoặc email trên; Bên B phản hồi trong 2 ngày làm việc và xóa trong 30 ngày, trừ dữ liệu còn cần cho nghĩa vụ chưa hoàn thành hoặc pháp luật yêu cầu lưu."],
+   ["Điều 10. Giao kết điện tử","Hợp đồng được giao kết bằng phương tiện điện tử theo Luật Giao dịch điện tử 2023. Bên A đánh dấu đồng ý, ghi họ tên và ký tay trên màn hình; hai bên thỏa thuận chữ ký này là chữ ký điện tử của Bên A. Máy chủ lưu nội dung hợp đồng, phiên bản, mã SHA-256 của nội dung, ảnh chữ ký, thời điểm ký theo giờ máy chủ (UTC+7) và thông tin thiết bị. Bên B xác nhận hợp đồng bằng tin nhắn Zalo kèm mã hợp đồng hoặc khi nhận đồ, và gửi bản hợp đồng cho Bên A khi được yêu cầu."],
+   ["Điều 11. Giải quyết tranh chấp","Hai bên thương lượng trước. Không thương lượng được thì đưa ra Tòa án nhân dân có thẩm quyền tại thành phố Đà Nẵng."]];
+  if(!html) return dk.map(([t,b])=>(t?t+"\n":"")+(b||"")).join("\n\n");
+  return dk.map(([t,b],i)=>i===0?`<h3>${t}</h3>`:`<p>${t?`<b>${t}.</b> `.replace("..",".")+"":""}${b}</p>`).join(""); }
 
 /* ---------- Tra cứu đồ ký gửi ---------- */
 function veTraCuu(){ const el=document.getElementById("smain"); if(el.dataset.p==="tra-cuu"){ traCuu(); return; } el.dataset.p="tra-cuu";
-  el.innerHTML=`<div class="max gut sect" style="max-width:860px"><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#ban">Bán & ký gửi</a> / <span>Tra cứu</span></nav>
+  el.innerHTML=`<div class="max gut sect" style="max-width:860px"><div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button><nav class="crumb"><a href="#">Trang chủ</a> / <a href="#ban">Bán & ký gửi</a> / <span>Tra cứu</span></nav></div>
    <h1>Tra cứu đồ ký gửi</h1><p class="muted">Xem món đang bán, số tiền sắp nhận và lịch tự giảm giá.</p>
    <div class="card stack"><div class="row"><input id="traSdt" inputmode="tel" placeholder="Số Zalo đã đăng ký" style="flex:1 1 180px"><input id="traMa" placeholder="Mã DK-… hoặc mã món" style="flex:1 1 180px;text-transform:uppercase"><button class="btn" data-a="tra">Xem</button></div>
    <p class="small muted" style="margin:0">Mã DK-… nhận khi gửi yêu cầu bán, hoặc mã món trên biên nhận ký gửi.</p><div id="traKq"></div></div></div>`; traCuu(); }
@@ -320,7 +485,7 @@ function traCuu(){ const k=document.getElementById("traKq"); if(!k||!S.traSo) re
 /* ---------- Yêu thích ---------- */
 function veThich(){ const el=document.getElementById("smain"), t=homNay(); el.dataset.p="yeu-thich";
   const l=[...THICH].map(id=>S.mon.find(m=>m.id===id)).filter(m=>m&&m.tt==="dang"), mat=[...THICH].length-l.length;
-  el.innerHTML=`<div class="max gut sect"><h1>Yêu thích</h1><p class="muted">Lưu trên máy này. Mỗi món chỉ có một chiếc, đặt sớm để giữ.</p>
+  el.innerHTML=`<div class="max gut sect"><div class="backrow"><button class="back" data-a="back">${ico("left")}Quay lại</button></div><h1>Yêu thích</h1><p class="muted">Lưu trên máy này. Mỗi món chỉ có một chiếc, đặt sớm để giữ.</p>
    ${luoi(l,t,`<div class="empty"><b>${S.ready?"Chưa có món yêu thích":"Đang tải…"}</b>Bấm hình trái tim trên món bạn thích để lưu lại. <a href="#mua" data-a="loc" data-k="reset">Xem kệ hàng →</a></div>`)}
    ${mat>0&&S.ready?`<p class="small muted">${mat} món bạn từng thích đã có người mua.</p>`:""}</div>`; }
 
@@ -351,9 +516,12 @@ function veGio(){ const p=document.getElementById("cartPanel"); if(!p) return; c
       document.getElementById("smain").dataset.p=""; veLai();
     }catch(e){ loiGhi(e); f.querySelector("button[type=submit]").disabled=false; } }); }
 function renderShopDem(){ const n=gioHop().length, c=document.getElementById("cartN"); if(c){ c.textContent=n; c.hidden=!n; } const tn=[...THICH].filter(id=>S.mon.some(m=>m.id===id&&m.tt==="dang")).length, th=document.getElementById("thichN"); if(th){ th.textContent=tn; th.hidden=!tn; } }
+function moMenuBrand(){ const nhom=[["Luxury",BRANDS.filter(b=>phanKhuc({brand:b})==="luxury")],["Cao cấp",BRANDS.filter(b=>phanKhuc({brand:b})==="caocap")],["Tầm trung",BRANDS.filter(b=>phanKhuc({brand:b})==="tamtrung")]];
+  openSheet(`<div class="row"><h2>Thương hiệu</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>${nhom.filter(n=>n[1].length).map(([t,l])=>`<b>${t}</b><div class="bchips dark">${l.map(b=>`<a href="#mua" data-a="hieu" data-v="${esc(b)}">${esc(b)}</a>`).join("")}</div>`).join("")}`,true); }
 function moMenuDM(){ openSheet(`<div class="row"><h2>Danh mục</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
   <div class="menudm">${DM.map(([k,tx])=>`<a href="#mua" data-a="loc" data-k="dm" data-v="${k}">${ico(k,"cico sm")}<span>${tx}</span></a>`).join("")}</div>
   <b>Phân khúc</b><div class="menudm">${Object.entries(PK).map(([k,p])=>`<a href="#mua" data-a="loc" data-k="pk" data-v="${k}">${ico(k==="luxury"?"luxury":"giam","cico sm")}<span>${p.ten}<small>${p.mo}</small></span></a>`).join("")}</div>
+  <b>Thương hiệu</b><div class="bchips dark">${BR_HOT.map(b=>`<a href="#mua" data-a="hieu" data-v="${esc(b)}">${esc(b)}</a>`).join("")}<button type="button" data-a="menuBrand">Tất cả hãng</button></div>
   <a class="btn wine" href="#ban" data-a="dong">Bán đồ của bạn</a>`,true); }
 
 function pillTT(m){ const c={cho:"info",dang:"ok",giu:"warn",ban:"",thue:"ok",tra:"bad"}[m.tt]||""; return `<span class="pill ${c}">${esc(TT[m.tt]||m.tt)}</span>`; }
@@ -521,7 +689,7 @@ function veWizard(){ if(!S.W) wizMoi(); const W=S.W, d=W.d, b=document.getElemen
      <label class="f">Màu<input id="wMau" value="${esc(d.mau||"")}"></label><label class="f">Chất liệu<input id="wCL" value="${esc(d.chatLieu||"")}"></label>
      <label class="f">Danh mục trên web<select id="wDM">${DM.map(([k,t])=>`<option value="${k}" ${danhMuc(d)===k?"selected":""}>${t}</option>`).join("")}</select></label>
      <label class="f">Phân khúc<select id="wPK"><option value="">Tự xếp theo hãng và giá</option>${Object.entries(PK).map(([k,x])=>`<option value="${k}" ${d.phanKhuc===k?"selected":""}>${x.ten}</option>`).join("")}</select></label>
-     <label class="f">${!laKG(d)?"Số lượt đã cho thuê":"Số lần chủ đồ đã mặc"}<input id="wLuot" inputmode="numeric" value="${esc(d.soLuot??"")}"></label></div>
+     <label class="f">${!laKG(d)?"Số lượt đã cho thuê":"Số lần chủ đồ đã mặc"}<input id="wLuot" inputmode="numeric" data-plain value="${esc(d.soLuot??"")}"></label></div>
      <datalist id="dsBrand">${[...new Set(S.mon.map(m=>m.brand).filter(Boolean).concat(["SIXDO","D.CHIC","Elise","NEM","Chanel","Dior","Coach","Gucci","Louis Vuitton","Zara"]))].map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`; }
   if(W.buoc===3){ const c=d.tinhTrang||{}, gy=hangGoiY(c,d.soLuot);
     wb.innerHTML=`<div class="stack"><b>Kiểm tra tình trạng</b><div class="checks">${TOT.concat(LOI).map(([k,tx])=>`<label><input type="checkbox" data-tt="${k}" ${c[k]?"checked":""}>${tx}</label>`).join("")}</div>
@@ -656,7 +824,7 @@ function dsChuDo(){ const map={}; const add=(s,ten)=>{ if(!s) return null; map[s
   return Object.values(map).sort((a,b)=>b.qh-a.qh||b.no-a.no||b.mon.length-a.mon.length); }
 function admChu(b){ const moi=S.dangky.filter(x=>x.tt==="moi"), l=dsChuDo().filter(c=>c.mon.length||c.dk.some(x=>x.tt!=="tuchoi")), tong=l.reduce((s,c)=>s+c.no,0);
   b.innerHTML=`${moi.length?`<section class="stack"><h3>Đăng ký mới <span class="pill wine">${moi.length}</span></h3>${moi.map(x=>`<div class="task p2"><span class="bar"></span><div><div class="t">${esc(x.ten)} · ${esc(x.brand)} ${esc(x.loai)}</div><div class="d num">${esc(x.sdt)} · ${moTaDK(x)}${x.moTa?" · "+esc(x.moTa):""}</div></div>
-    <div class="acts"><button class="btn sm ${x.offer?"line":"wine"}" data-a="offer" data-id="${x.id}">${x.offer?"Sửa offer":"Gửi offer"}</button><button class="btn sm ${x.offer?"wine":"line"}" data-a="nhanDK" data-id="${x.id}">Nhận đồ</button><button class="btn sm line" data-a="tuChoi" data-id="${x.id}">Từ chối</button></div></div>`).join("")}</section>`:""}
+    <div class="acts"><button class="btn sm line" data-a="hoSo" data-id="${x.id}">Hồ sơ</button><button class="btn sm ${x.offer?"line":"wine"}" data-a="offer" data-id="${x.id}">${x.offer?"Sửa offer":"Gửi offer"}</button><button class="btn sm ${x.offer?"wine":"line"}" data-a="nhanDK" data-id="${x.id}">Nhận đồ</button><button class="btn sm line" data-a="tuChoi" data-id="${x.id}">Từ chối</button></div></div>`).join("")}</section>`:""}
    <section class="stack"><div class="row" style="justify-content:space-between"><h3>Chủ đồ</h3><span class="small muted num">Đang chờ trả tổng ${vnd(tong)}</span></div>
    ${l.length?`<div class="tbl"><table><thead><tr><th>Chủ đồ</th><th class="r">Đang bán</th><th class="r">Đã bán</th><th class="r">Chờ trả</th><th class="r">Đã trả</th></tr></thead><tbody>${l.map(c=>`<tr class="row-chu" data-a="moChu" data-v="${c.sdt}" tabindex="0"><td><b>${esc(c.ten||"—")}</b><div class="small muted num">${esc(c.sdt)}</div></td><td class="r num">${c.mon.filter(m=>m.tt==="dang"||m.tt==="thue").length}</td><td class="r num">${c.mon.filter(m=>m.tt==="ban").length}</td><td class="r num">${c.no?vnd(c.no):"—"}${c.qh?` <span class="pill bad">${c.qh} quá hạn</span>`:""}</td><td class="r num">${c.da?vnd(c.da):"—"}</td></tr>`).join("")}</tbody></table></div>`
     :`<div class="empty"><b>Chưa có chủ đồ ký gửi</b>Khi nhận đồ ký gửi, hồ sơ chủ đồ tự tạo theo số Zalo.</div>`}</section>`; }
@@ -672,6 +840,24 @@ function moTin(tieuDe,noiDung){ openSheet(`<div class="row"><h2>${esc(tieuDe)}</
 function tinKhach(id){ const x=S.dathang.find(y=>y.id===id); if(!x) return; moTin("Tin gửi "+x.ten,`Chào ${x.ten}, CHÉRIE Seconde đang giữ ${(x.items||[]).length} món cho bạn:\n${(x.items||[]).map(i=>`• ${i.ten}: ${vnd(i.gia)}`).join("\n")}\nTổng: ${vnd(x.tong)} (chưa gồm phí ship).\nTiệm gửi mã VietQR ngay sau tin này, bạn chuyển khoản trong 24 giờ để tiệm đóng gói nhé. Cảm ơn bạn đã chọn CHÉRIE!`); }
 const HINH={ban:"Ký gửi bán",thue:"Ký gửi cho thuê",bandut:"Bán đứt cho tiệm",tindung:"Đổi tín dụng CHÉRIE"};
 function moTaDK(x){ return `${HINH[x.hinh]||"Ký gửi"}${x.hangKhach?" · tự chấm hạng "+x.hangKhach:""}${x.uocTinh?" · web ước tính bán "+vnd(x.uocTinh):""}${x.offer?" · đã offer "+vnd(x.offer):""} · muốn ${x.giaMuon?vnd(x.giaMuon):"—"}${x.giaSan?" · sàn "+vnd(x.giaSan):""} · ${x.bangChung||""}`; }
+async function moHoSo(id){ const x=S.dangky.find(y=>y.id===id); if(!x) return; const a=x.ai||null, r=a?(RUI[a.ruiRo]||RUI.khongro):null, sp=(x.anhKH&&x.anhKH.sp)||[], hdA=(x.anhKH&&x.anhKH.hd)||[];
+  openSheet(`<div class="row"><div><div class="eyebrow">${esc(x.id)}${x.maHD?" · "+esc(x.maHD):""}</div><h2>${esc(x.ten)} · ${esc(x.brand)} ${esc(x.loai)}</h2></div><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
+   <div class="small muted">${moTaDK(x)}${x.moTa?" · "+esc(x.moTa):""}${(x.phuKien||[]).length?" · Kèm: "+esc(x.phuKien.join(", ")):""}</div>
+   <div class="thumbs" id="hsAnh">${sp.concat(hdA).map(i=>`<div class="t"><div class="ph" data-rieng="${esc(i)}"><div class="mono">…</div></div></div>`).join("")||`<span class="small muted">Khách gửi ảnh qua Zalo.</span>`}</div>
+   ${a?`<div class="card stack" style="gap:6px"><b>AI đánh giá sơ bộ</b><div class="small">${a.hang?HANG[a.hang].ten:"—"} · độ mới ~${a.doMoi||"?"}% · năm SX ${esc(a.namSanXuat||"?")} ${a.canCuNam?"("+esc(a.canCuNam)+")":""}</div>
+     <div class="small"><span class="pill ${r[0]}">${r[1]}</span> ${(a.lyDo||[]).map(esc).join(" · ")}</div>${(a.loi||[]).length?`<div class="small">Hao mòn: ${a.loi.map(esc).join(", ")}</div>`:""}</div>`:""}
+   <div class="card stack" id="hsHD" style="gap:6px"><b>Hợp đồng</b><span class="small muted">Đang tải…</span></div>
+   <div class="row"><button class="btn wine sm" data-a="offer" data-id="${esc(id)}">${x.offer?"Sửa offer":"Gửi offer"}</button><button class="btn line sm" data-a="nhanDK" data-id="${esc(id)}">Nhận đồ</button></div>`,true);
+  document.querySelectorAll("[data-rieng]").forEach(async el=>{ try{ const r=await SC.call("anhRieng",{id:el.dataset.rieng}); el.innerHTML=`<img src="${r.data}" alt="">`; }catch(e){ el.innerHTML=`<div class="mono small">Không mở được</div>`; } });
+  try{ const r=await SC.call("hoSoDK",{id}); const h=r.hd, box=document.getElementById("hsHD"); if(!box) return;
+    if(!h){ box.innerHTML=`<b>Hợp đồng</b><span class="small muted">Đăng ký cũ, chưa có hợp đồng online.</span>`; return; }
+    box.innerHTML=`<b>Hợp đồng ${esc(h.id)}</b><div class="small">${esc(h.hoTen)} · CCCD ${esc(h.cccd)} · ${esc(h.sdt)} · ký ${esc(h.gioMayChu)}</div>
+     <div class="small">${esc(h.diaChi)}${h.soTK?` · ${esc(h.nganHang)} ${esc(h.soTK)} · ${esc(h.chuTK)}`:""}</div><div class="small muted num">SHA-256 ${esc(String(h.hash).slice(0,24))}… · bản ${esc(h.phienBan)}</div>
+     <div class="thumbs">${[h.cccdTruoc,h.cccdSau,h.chuKy].filter(Boolean).map(i=>`<div class="t"><div class="ph" data-rieng2="${esc(i)}"><div class="mono">…</div></div></div>`).join("")}</div>
+     ${h.noiDung?`<details><summary class="small">Xem nội dung đã ký</summary><pre class="hdbox" style="white-space:pre-wrap">${esc(h.noiDung)}</pre></details>`:""}
+     ${h.cccdTruoc===""&&h.dongYAnh!=="Có"?`<span class="small muted">Không có ảnh CCCD. Đối chiếu CCCD khi nhận đồ.</span>`:""}`;
+    box.querySelectorAll("[data-rieng2]").forEach(async el=>{ try{ const r=await SC.call("anhRieng",{id:el.dataset.rieng2}); el.innerHTML=`<img src="${r.data}" alt="" style="object-fit:contain;background:#fff">`; }catch(e){ el.innerHTML=`<div class="mono small">Chỉ chủ tiệm</div>`; } });
+  }catch(e){ const box=document.getElementById("hsHD"); if(box) box.innerHTML=`<b>Hợp đồng</b><span class="small muted">${esc(e.message||"Không tải được")}</span>`; } }
 function moOffer(id){ const x=S.dangky.find(y=>y.id===id); if(!x) return; const pk=x.phanKhuc||phanKhuc({brand:x.brand,giaNiemYet:x.giaMua}), est=Number(x.uocTinh)||0, md=tron(est*MUA_DUT[pk]);
   openSheet(`<div class="row"><h2>Gửi offer · ${esc(x.ten)}</h2><button class="x" data-a="dong" aria-label="Đóng">×</button></div>
    <div class="small muted">${esc(x.brand)} ${esc(x.loai)} · ${moTaDK(x)}</div>
@@ -699,9 +885,19 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   if(a==="boLoc"){ const k=el.dataset.k; S.shop[k]=LOC0[k]; if(k==="q"){ const q=document.getElementById("sq"); if(q) q.value=""; } veMua(); return; }
   if(a==="locGiam"){ S.shop.giam=S.shop.giam?"":"1"; veMua(); return; }
   if(a==="menuDM") return moMenuDM();
-  if(a==="goSell"){ e.preventDefault(); S.ban=Object.assign(S.ban||{},v?{cach:v}:{},el.dataset.dm?{dm:el.dataset.dm}:{}); const m=document.getElementById("smain"); if(m) m.dataset.p=""; if(location.hash==="#ban") veLai(); else location.hash="ban"; window.scrollTo({top:0}); return; }
-  if(a==="bHang"){ S.ban.hang=v; el.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b===el)); veOffer(); return; }
-  if(a==="bCach"){ S.ban.cach=v; veOffer(); return; }
+  if(a==="goSell"){ e.preventDefault(); S.ban=Object.assign(S.ban||banMoi(),v?{cach:v}:{},el.dataset.dm?{dm:el.dataset.dm}:{}); const m=document.getElementById("smain"); if(m) m.dataset.p=""; if(location.hash==="#ban") veLai(); else location.hash="ban"; window.scrollTo({top:0}); return; }
+  if(a==="bHang"){ S.ban.hang=v; veBuoc(); return; }
+  if(a==="bCach"){ S.ban.cach=v; veBuoc(); return; }
+  if(a==="bTiep"){ if(!kiemBuoc(S.ban)) return; S.ban.buoc=Math.min(6,S.ban.buoc+1); veBuoc(); document.getElementById("bSteps").scrollIntoView({block:"start",behavior:"smooth"}); return; }
+  if(a==="bLui"){ S.ban.buoc=Math.max(1,S.ban.buoc-1); veBuoc(); return; }
+  if(a==="bBoAnh"){ S.ban.anh.splice(Number(v),1); veBuoc(); return; }
+  if(a==="bAI"){ S.ban.ai=null; S.ban.aiTT=""; chayAI(); return; }
+  if(a==="kyLai"){ S.ban.ky=""; const c=document.getElementById("hKy"); c.getContext("2d").clearRect(0,0,c.width,c.height); return; }
+  if(a==="bKy") return guiHopDong(el);
+  if(a==="heroTab"){ S.heroTab=v; document.getElementById("heroDuo").dataset.tab=v; document.querySelectorAll('[data-a="heroTab"]').forEach(b=>b.setAttribute("aria-selected",b===el)); return; }
+  if(a==="hieu"){ e.preventDefault(); closeSheet(); datLoc({hieu:v}); return; }
+  if(a==="menuBrand") return moMenuBrand();
+  if(a==="back"){ if(NAV.dem>0){ NAV.dem-=2; history.back(); } else location.hash=""; return; }
   if(a==="anhSP") return doiAnhSP(v);
   if(a==="thich"){ e.preventDefault(); THICH.has(id)?THICH.delete(id):THICH.add(id); luuThich(); document.querySelectorAll(`.heart[data-id="${CSS.escape(id)}"]`).forEach(b=>b.setAttribute("aria-pressed",THICH.has(id))); toast(THICH.has(id)?"Đã lưu vào Yêu thích.":"Đã bỏ khỏi Yêu thích."); if(trangShop()==="yeu-thich") veThich(); renderShopDem(); return; }
   if(a==="gio") return moGio();
@@ -743,6 +939,7 @@ document.addEventListener("click",async e=>{ const el=e.target.closest("[data-a]
   if(a==="xoa") return xacNhan(`Xoá "${esc(m.ten)}" khỏi kho?`,"Xoá",()=>S.db.doc("mon/"+id).delete());
   if(a==="tuChoi") return xacNhan("Từ chối đăng ký này? Nhớ nhắn Zalo báo lý do cho khách.","Từ chối",()=>S.db.doc("dangky/"+id).update({tt:"tuchoi"}));
   if(a==="offer") return moOffer(id);
+  if(a==="hoSo") return moHoSo(id);
   if(a==="nhanDK"){ const d=S.dangky.find(x=>x.id===id); const ml=d.hinh==="bandut"||d.hinh==="tindung"; wizMoi({nguon:ml?"mualai":(d.hinh==="thue"?"kyguithue":"kygui"),hang:d.hangKhach||"A",danhMuc:d.danhMuc||"",phanKhuc:d.phanKhuc||"",giaVon:ml?d.offer||0:0,ten:[d.brand,d.loai].filter(Boolean).join(" "),brand:d.brand,loai:d.loai,giaNiemYet:d.giaMua,giaDang:d.giaMuon,giaSan:d.giaSan,chuDo:ml?"":d.sdt,chuTen:ml?"":d.ten,bangChung:d.bangChung,moTa:"",ghiChuKhach:ml?(d.ten+" "+d.sdt+(d.hinh==="tindung"?" · tín dụng":" · tiền mặt")):d.moTa,dangkyId:d.id}); closeSheet(); location.hash==="#qt-nhan"?(lastShell="",render()):location.hash="qt-nhan"; return; }
   if(a==="daTra"){ const col=el.dataset.k==="don"?"don":"thue"; try{ await S.db.doc(col+"/"+id).update({daTra:true,ngayTraTien:homNay()}); toast("Đã ghi chuyển tiền."); const so=(S.don.concat(S.thue).find(x=>x.id===id)||{}).chuDo; if(so&&sheetOpen()) setTimeout(()=>moChu(so),300); }catch(x){ loiGhi(x); } return; }
   if(a==="traHet") return xacNhan("Ghi đã chuyển tất cả khoản chờ trả cho chủ đồ này?","Đã chuyển tất cả",async()=>{ for(const r of noChuDo().filter(x=>x.chu===v)) await S.db.doc((r.k==="don"?"don/":"thue/")+r.id).update({daTra:true,ngayTraTien:homNay()}); toast("Đã ghi chuyển tiền."); });
@@ -758,7 +955,7 @@ function loginHtml(){ return `<div class="gut" style="min-height:100vh;display:f
   <a class="word" href="../">CHÉRIE<em>Seconde</em></a><h1>Quản trị</h1>
   ${S.noApi?`<div class="banner">Chưa kết nối máy chủ. Chủ tiệm triển khai Apps Script rồi dán link vào config.js.</div>`:`
   <label class="f">Bạn là<select id="lgNv"><option value="">Đang tải danh sách…</option></select></label>
-  <label class="f" id="lgPinW">Mã PIN<input id="lgPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></label>
+  <label class="f" id="lgPinW">Mã PIN<input id="lgPin" type="password" inputmode="numeric" data-plain autocomplete="current-password" maxlength="8"></label>
   <div class="small muted" id="lgNote"></div><button class="btn wine block" type="submit" id="lgBtn">Đăng nhập</button>`}</form></div>`; }
 async function moLogin(){ const sel=document.getElementById("lgNv"); if(!sel) return; let ds=[];
   try{ ds=(await SC.call("staff")).staff||[]; }catch(e){ document.getElementById("lgNote").textContent=e.message||"Không tải được danh sách."; return; }
